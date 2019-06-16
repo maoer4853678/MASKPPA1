@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock %}
+
+
+{% block page %}
+<div class="col-xs-12 well">
+    <!-- left sidebar -->
+    <div class="col-xs-3" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
+            Please input glasses here:
+            <form action="" method='post'>
+
+                <table>
+                    <tbody>
+                    {% csrf_token %}
+                    {{ form.as_table }}
+                    <tr>
+                        <td><input type="submit" name="plot" value="Plot">
+                    </tr>
+                    </tbody>
+                </table>
+            </form>
+        </div>
+
+        <div class="col-xs-12" style="height: 10px"></div>
+
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px; overflow: scroll; height: 400px">
+            All glasses:<br>
+            {{ all_glasses | safe }}
+        </div>
+    </div>
+
+    <div class="col-xs-9" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
+            <div class="col-md-12" id="plot_ppa" style="height: 320px"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script type="text/javascript">
+function plotNumeric(myChart, title, ppa_teg, ppa_val) {
+    option = {
+        title: {
+            text: title,
+            textAlign: 'auto'
+        },
+        tooltip: { show: true },
+        animation: false,
+        backgroundColor: "#ffffff",
+        grid: [
+            {
+                left: '4%',
+                right: '4%',
+                top: '12%',
+                bottom: '12%',
+                containLabel: false,
+                show: true
+            }
+        ],
+        xAxis: [
+            {
+                type: 'value',
+                boundaryGap: false,
+                nameLocation: 'middle',
+                nameGap: 20,
+                axisTick: {
+                    show: false
+                },
+                axisLine: {
+                    show: false
+                }
+            }
+        ],
+        yAxis: [
+            {
+                type: 'value',
+                position: 'left',
+                axisTick: {
+                    show: false
+                },
+                axisLine: {
+                    show: false
+                }
+            }
+        ],
+        series: [
+            {
+                type: 'scatter',
+                data: ppa_teg,
+                itemStyle: { normal: { color: '#4286f4' } },
+                symbolSize: 6
+
+            },
+            {
+                type: 'line',
+                data: ppa_val,
+                lineStyle: { normal: { color: '#ba0000', width: 4} },
+                itemStyle: { normal: { color: '#ba0000' } },
+                symbolSize: 6
+            }
+        ]
+    };
+    myChart.setOption(option);
+}
+
+
+var myChart1 = echarts.init(document.getElementById('plot_ppa'))
+
+plotNumeric(myChart1, {{ title | safe }}, {{ ppa_teg | safe }}, {{ ppa_val | safe }})
+</script>
+{% endblock %}
+

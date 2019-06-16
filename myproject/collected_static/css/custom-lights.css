@@ -1,0 +1,41 @@
+.led-box {
+  height: 30px;
+  width: 100%;
+}
+
+.led-red {
+  width: 100%;
+  height: 100%;
+  background-color: #ba0000;
+  opacity: 0.2
+}
+
+.led-yellow {
+  width: 100%;
+  height: 100%;
+  background-color: #edc309;
+  opacity: 0.2
+}
+
+.led-green {
+  width: 100%;
+  height: 100%;
+  background-color: #00ba38;
+  opacity: 0.2
+}
+
+.led-blue {
+  width: 100%;
+  height: 100%;
+  background-color: #619cff;
+  opacity: 0.2
+}
+
+.blink {
+  /* animation: blinker 1s linear infinite; */
+  opacity: 1 !important
+}
+
+/* @keyframes blinker {
+  50% { opacity: 0.5; }
+} */

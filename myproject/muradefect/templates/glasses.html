@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block page %}
+<div class="col-xs-12 well">
+    <!-- left sidebar -->
+    <div class="col-xs-3" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
+            Please input glasses here:
+            <form action="" method='post'>
+                {% csrf_token %}
+                {{ form.as_table }}<br>
+                <table>
+                    <tbody>
+                    <tr>
+                        <td><input type="submit" name="add" value="Add"></td>
+                        <td><input type="submit" name="delete" value="Delete"></td>
+                        <td><input type="submit" name="clear" value="Clear"></td>
+                        <td><input type="submit" name="optimize" value="Optimize"></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </form>
+        </div>
+
+        <div class="col-xs-12" style="height: 10px"></div>
+
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px">
+            Selected glasses:<br>
+            {{ glass_selected | safe }}
+            {{ info }}
+        </div>
+
+        <div class="col-xs-12" style="height: 10px"></div>
+
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px; overflow: scroll; height: 400px">
+            All glasses:<br>
+            {{ all_glasses | safe }}
+        </div>
+    </div>
+
+    <div class="col-xs-9" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
+            The selected glasses' parameters are shown here:<br>
+            {{ glass_pars | safe }}
+        </div>
+
+        <div class="col-xs-12" style="height: 10px">
+        </div>
+
+        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
+            The optimized result is shown here:<br>
+            {{ optimize_result | safe }}
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script type="text/javascript">
+</script>
+{% endblock %}
+

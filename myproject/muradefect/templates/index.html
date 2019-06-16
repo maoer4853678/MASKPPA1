@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block page %}
+
+<div class="col-xs-12 well">
+    <!-- left sidebar -->
+    <div class="col-xs-3" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px">
+            <form method='post'>
+                {% csrf_token %}
+                <table>{{ form.as_table }}</table>
+                <input type="submit" value="Submit">
+            </form>
+        </div>
+    </div>
+
+    <div class="col-xs-9" style="padding:10px">
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px; height: 400px; overflow: scroll">
+            The past production of last 1 week is shown here:<br>
+
+            {{ info | safe }}
+        </div>
+
+        <div class="col-xs-12" style="height: 10px"></div>
+
+        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px">
+            The optimized OFFSET parameters are shown here:<br>
+            {{ result | safe}}
+        </div>
+    </div>
+</div>
+{% endblock %}
