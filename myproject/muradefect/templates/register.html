@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html  lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" type="text/css" href="../static/assets/plugins/bootstrap/css/bootstrap.css" />
+		<link rel="stylesheet" type="text/css" href="../static/css/custom.css"  />
+		<title>Sherk</title>
+		<link href="../static/assets/images/favicon.ico" rel="shortcut icon">
+	</head>
+
+	<body>	
+		<div class="container" style="width: 750px">
+			<div class="breadcrumb">
+			<form class="form-signin" method="post" action="/register">
+			{% csrf_token %}
+			<h2 class="form-signin-heading">OFFSET优化工具平台</h2>
+			<input name="username" type="text" class="form-control" placeholder="用户名" required autofocus>
+			<input name="password" type="password" class="form-control" placeholder="密码" required>
+			<input name="password1" type="password" class="form-control" placeholder="确认密码" required>
+			 </div>
+
+            <div class="breadcrumb">
+			<div class="col-xs-6" style="padding-right: 10px width:50%">
+				<button class="btn btn-lg btn-primary btn-block" type="submit">确认注册</button>
+			</div>
+            </div>
+
+            <div class="breadcrumb">
+			<div class="col-xs-6" style="padding-left: 10px width:50%">
+				<a href="/">
+                 <button class="btn btn-lg btn-primary btn-block" type="button" >取消</button>
+                </a>
+            </div>
+            </div>
+            
+		     </form>
+		    {{ error }}	
+		</div>
+	</body>
+</html>

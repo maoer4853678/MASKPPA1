@@ -21,7 +21,13 @@ class AddForm(forms.Form):
 class LoginForm(forms.Form):
     username = forms.CharField()
     password = forms.CharField()
-
+    
+    
+class RegisterForm(forms.Form):
+    username = forms.CharField(label='注册用户名', max_length=100)
+    password1 = forms.CharField(label='设置密码', widget=forms.PasswordInput())
+    password2 = forms.CharField(label='确认密码', widget=forms.PasswordInput())
+#    email = forms.EmailField(label='电子邮件')
 
 class GlassForm(forms.Form):
     glasses = forms.CharField(required=False)
@@ -34,10 +40,8 @@ class GlassPlotForm(forms.Form):
 
 class OptionForm(forms.Form):
     ## 若初始值 需要从配置文件读取，需要重写 init
-    th1_min = forms.FloatField(label = "良品区间_下限")
-    th1_max = forms.FloatField(label = "良品区间_上限")
-    th2_min = forms.FloatField(label = "管控区间_上限")
-    th2_max = forms.FloatField(label = "管控区间_下限")
+    th1 = forms.FloatField(label = "管控限1")
+    th2 = forms.FloatField(label = "管控限2")
     ppa_x  = forms.FloatField(label = "PPAX报警上限")
     ppa_y  = forms.FloatField(label = "PPAY报警上限")
     offset_x  = forms.FloatField(label = "OFFSETX报警上限")
@@ -46,14 +50,8 @@ class OptionForm(forms.Form):
     
     def __init__(self,settings):
         super(OptionForm,self).__init__(settings)
-        self.fields['th1_min'].initial = float(settings['th1_min'])
-        self.fields['th1_max'].initial = float(settings['th1_max'])
-        self.fields['th2_min'].initial = float(settings['th2_min'])
-        self.fields['th2_max'].initial = float(settings['th2_max'])
-        self.fields['ppa_x'].initial = float(settings['ppa_x'])
-        self.fields['ppa_y'].initial = float(settings['ppa_y'])
-        self.fields['offset_x'].initial = float(settings['offset_x'])
-        self.fields['offset_y'].initial = float(settings['offset_y'])
-        self.fields['offset_tht'].initial = float(settings['offset_tht'])
+        for i in ['th1',"th2","ppa_x","ppa_y","offset_x","offset_y","offset_tht"]:
+            self.fields[i].initial = float(settings[i])
+            self.fields[i].widget.attrs.update({'class': 'form-control'})
         
     

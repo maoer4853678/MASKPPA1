@@ -1,0 +1,180 @@
+{% extends "base.html" %}
+
+{% block header %}
+<script src="../static/js/echarts.js"></script>
+{% endblock %}
+{% block user %}
+<ul class="navbar-nav my-lg-0">
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle text-muted waves-effect waves-dark" href="" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><img src="../static/assets/images/users/1.jpg" alt="user" class="profile-pic m-r-10" />{{username}}</a>
+    </li>
+</ul>
+{% endblock %}
+
+{% block page %}
+            <div class="container-fluid">
+                {% csrf_token %}
+                <div class="row">
+                    <label class="breadcrumb">GLASSID</label>
+                    <div class="breadcrumb">
+                    <select style="width: 230px" id="glassid">
+                        {% for glassid in glassids %}
+                            <option>{{ glassid }}</option>
+                        {% endfor %} 
+                    </select>
+                </div>
+                
+                    <label class="breadcrumb">CHAMBER</label>
+                    <div class="breadcrumb">
+                    <select style="width: 230px"  id="chamber"
+                     >
+                        {% for chamber in chambers %}
+                            <option>{{ chamber }}</option>
+                        {% endfor %} 
+                    </select>
+                </div>
+                
+                <div class="breadcrumb">
+                     <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
+                </div>
+
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div class="btn-group" id = 'select' data-toggle="buttons" >
+                  <label class="btn btn-primary btn ">
+                    <input type="radio" name="options" id="option1" onchange="FreshData(this.value)" value="before" > 优化前
+                  </label>
+                  <label class="btn btn-primary btn">
+                    <input type="radio" name="options" id="option2" onchange="FreshData(this.value)" value="after"> 优化后
+                  </label>
+                    </div>
+                   </div>
+                </div>
+                 
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div id="PPA_X" style="width: 1300px;height:400px"></div>
+                    </div>
+                    <div class="breadcrumb">
+                    <div id="PPA_Y" style="width: 1300px;height:400px;"></div>
+                    </div>
+                </div>
+
+                <script type="text/javascript">
+                // 基于准备好的dom，初始化echarts实例
+                var alldata = {{alldata |safe}}
+                var option = {
+                    title: {
+                        text: ''
+                    },
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    legend: {
+                        show : true,
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '3%',
+                        containLabel: true
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            xAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'slider',
+                            yAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'inside',
+                            xAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'inside',
+                            yAxisIndex: 0,
+                            filterMode: 'empty'
+                        }
+                    ],
+                    toolbox: {
+                        show: true,
+                        feature: {
+                            dataZoom: {},
+                            dataView: {readOnly: false},
+                            restore: {},
+                            saveAsImage: {}
+                        }
+                    },
+                    xAxis: {
+                        type: 'value',
+                    },
+                    yAxis: {
+                        type: 'value',
+                    },
+                    series: [
+                        {
+                            symbolSize: 10,
+                            type:'scatter',
+                            data:[]
+                        }
+                    ]
+                };
+
+               var charts = ['PPA_X','PPA_Y']
+               function FreshData(select){
+                   console.log(select,"select")
+                   for (var i = 0; i < charts.length; i++) {
+                       item = charts[i]
+                       var myChart = echarts.init(document.getElementById(item));
+                       option.series[0].data = alldata[select][item]
+                       if (select=='before')
+                       {
+                        text = "优化前"+item+"分布"
+                       }
+                       else{
+                        text = "优化后"+item+"分布"
+                       }
+                       option.title.text = text
+                       myChart.setOption(option);
+                       
+                }
+               }
+
+             $("#glassid").select2()
+             $("#chamber").select2()
+
+              $("#ensure").click(function () {
+                    var $formData=new FormData();
+                    $formData.append("glassid",$("#glassid").val());
+                    $formData.append("chamber",$("#chamber").val());
+                    $.ajax({
+                        url:"/getopsppa",
+                        type:"POST",
+                        data:$formData,
+                        contentType:false,
+                        processData:false,
+                        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+                        success:function (data) {
+                                if (data.length==0){
+                                    alert("未发现符合条件数据")
+                                }
+                                else {
+                                    alldata = data
+                                    FreshData("before")
+                                }
+                        }
+                    })
+                    })
+
+                $("#ensure").click()  // 页面初始化后自动执行一次
+
+
+                </script>
+
+            </div>
+{% endblock %}

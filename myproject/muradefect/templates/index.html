@@ -1,32 +1,239 @@
 {% extends "base.html" %}
 
+{% block header %}
+<script src="../static/js/echarts.js"></script>
+<script src="../static/js/select2.min.js"></script>
+<link href="../static/css/select2.css" rel="stylesheet">
+
+{% endblock %}
+{% block user %}
+<ul class="navbar-nav my-lg-0">
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle text-muted waves-effect waves-dark" href="" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><img src="../static/assets/images/users/1.jpg" alt="user" class="profile-pic m-r-10" />{{username}}</a>
+    </li>
+</ul>
+{% endblock %}
+
 {% block page %}
-
-<div class="col-xs-12 well">
-    <!-- left sidebar -->
-    <div class="col-xs-3" style="padding:10px">
-        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px">
-            <form method='post'>
+            <div class="container-fluid">
                 {% csrf_token %}
-                <table>{{ form.as_table }}</table>
-                <input type="submit" value="Submit">
-            </form>
-        </div>
-    </div>
+                <div class="row">
+                    <label class="breadcrumb">产品名称</label>
+                    <div class="breadcrumb">
+                    <select style="width: 230px" id="productselect">
+                        {% for product in products %}
+                            <option>{{ product }}</option>
+                        {% endfor %} 
+                    </select>
+                </div>
+                
+                    <label class="breadcrumb">MASK套别</label>
+                    <div class="breadcrumb">
+                    <select style="width: 100px"  id="maskselect"
+                     >
+                        {% for maskset in masksets %}
+                            <option>{{ maskset }}</option>
+                        {% endfor %} 
+                    </select>
+                </div>
+               
+                       <label class="breadcrumb">起始时间</label>
+                <div class="breadcrumb">
+                     <input type="date" id="datetimeStart" class="form-control"/>
+               </div>
+                
+                       <label class="breadcrumb">终止时间</label>
+                <div class="breadcrumb">
+                    <input type="date" id="datetimeEnd" class="form-control"/>
+                </div>
 
-    <div class="col-xs-9" style="padding:10px">
-        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px; height: 400px; overflow: scroll">
-            The past production of last 1 week is shown here:<br>
+                
+                <div class="breadcrumb">
+                     <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
+                </div>
+                </div>
 
-            {{ info | safe }}
-        </div>
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div id="chart1" style="width: 750px;height:400px"></div>
+                    </div>
+                    <div class="breadcrumb">
+                    <div id="chart2" style="width: 750px;height:400px;"></div>
+                    </div>
+                </div>
+                <div class="breadcrumb"> </div>
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div id="chart3" style="width: 750px;height:400px"></div>
+                    </div>
+                    <div class="breadcrumb">
+                    <div id="chart4" style="width: 750px;height:400px;"></div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div id="chart5" style="width: 750px;height:400px"></div>
+                    </div>
+                    <div class="breadcrumb">
+                    <div id="chart6" style="width: 750px;height:400px;"></div>
+                    </div>
+                </div>
 
-        <div class="col-xs-12" style="height: 10px"></div>
+            <script type="text/javascript">
+                    function getDay(day){
+                    　　var today = new Date();
+                    　　var targetday_milliseconds=today.getTime() + 1000*60*60*24*day;
+                    　　today.setTime(targetday_milliseconds); 
+                    　　var tYear = today.getFullYear();
+                    　　var tMonth = today.getMonth();
+                    　　var tDate = today.getDate();
+                    　　tMonth = doHandleMonth(tMonth + 1);
+                    　　tDate = doHandleMonth(tDate);
+                    　　return tYear+"-"+tMonth+"-"+tDate;
+                    }
+                     
+                    function doHandleMonth(month){
+                    　　var m = month;
+                    　　if(month.toString().length == 1){
+                    　　　　m = "0" + month;
+                    　　}
+                    　　return m;
+                    }
+            </script>
 
-        <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px">
-            The optimized OFFSET parameters are shown here:<br>
-            {{ result | safe}}
-        </div>
-    </div>
-</div>
+                <script type="text/javascript">
+                // 基于准备好的dom，初始化echarts实例
+                var alldata = {{data|safe}}
+                var option = {
+                    title: {
+                        text: ''
+                    },
+                    tooltip: {
+                        trigger: 'axis'
+                    },
+                    legend: {
+                        show:true,
+                        data:['PPA_X','PPA_Y']
+                    },
+                    grid: {
+                        left: '3%',
+                        right: '4%',
+                        bottom: '10%',
+                        containLabel: true
+                    },
+                    dataZoom: [
+                        {
+                            type: 'slider',
+                            xAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'slider',
+                            yAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'inside',
+                            xAxisIndex: 0,
+                            filterMode: 'empty'
+                        },
+                        {
+                            type: 'inside',
+                            yAxisIndex: 0,
+                            filterMode: 'empty'
+                        }
+                    ],
+                    toolbox: {
+                        show: true,
+                        feature: {
+                            dataZoom: {},
+                            dataView: {readOnly: false},
+                            magicType: {type: ['line', 'bar']},
+                            restore: {},
+                            saveAsImage: {}
+                        }
+                    },
+                    xAxis: {
+                        name:"GLASSID",
+                        type: 'category',
+                        data: [],
+                        min : "dataMin",
+                        max : "dataMax"
+                    },
+                    yAxis: {
+                        name:"合格率",
+                        type: 'value',
+                         min : "dataMin",
+                        max : "dataMax"
+                    },
+                    series: [
+                        {
+                            name:'PPA_X',
+                            type:'line',
+                            data:[]
+                        },
+                        {
+                            name:'PPA_Y',
+                            type:'line',
+                            data:[]
+                        }
+                    ]
+                };
+ 
+                function FreshData()
+                {
+                    var charts = ['chart1','chart2','chart3','chart4','chart5','chart6']
+                    for (var i = 0; i < alldata.length; i++) {
+                        var myChart = echarts.init(document.getElementById(charts[i]));
+                        item = alldata[i]
+                        option.title.text = item.mask_id    
+                        option.xAxis.data = item.glass_id
+                        option.series[0].data = item.ppa_x
+                        option.series[1].data= item.ppa_y
+                        myChart.setOption(option);        
+                    }
+                }
+                FreshData()
+                
+                $("#productselect").select2()
+                $("#maskselect").select2()
+                
+                         
+                endtime=  getDay(0)
+                starttime = getDay(-7)
+                console.log(starttime,"starttime")
+                datetimeStart = document.getElementById("datetimeStart")
+                datetimeEnd = document.getElementById("datetimeEnd")
+                datetimeStart.value=starttime
+                datetimeEnd.value=endtime
+
+                $("#ensure").click(function () {
+                    var $formData=new FormData();
+                    $formData.append("starttime",$("#datetimeStart").val());
+                    $formData.append("endtime",$("#datetimeEnd").val());
+                    $formData.append("productselect",$("#productselect").val());
+                    $formData.append("maskselect",$("#maskselect").val());
+                    $.ajax({
+                        url:"/getppa",
+                        type:"POST",
+                        data:$formData,
+                        contentType:false,
+                        processData:false,
+                        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+                        success:function (data) {
+                                if (data.length==0){
+                                    alert("未发现符合条件数据")
+                                }
+                                else {
+                                    alldata = data
+                                    FreshData()
+                                }
+                        }
+                    })
+                    })
+
+                  $("#ensure").click()  // 页面初始化后自动执行一次
+                </script>
+
+            </div>
 {% endblock %}

@@ -25,8 +25,7 @@ SECRET_KEY = 'abwg#ajfesa+5qw^q4basopg0y5)duny*=l-k$wl^=u6bp(xqx'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['10.1.50.1','10.68.140.15','127.0.0.1'] 
 
 # Application definition
 
@@ -59,6 +58,7 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.static',
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
@@ -76,7 +76,7 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 
 DATABASES = {
     'default': {
-         'ENGINE': 'django.db.backends.postgresql_psycopg2',
+         'ENGINE': 'django.db.backends.postgresql',
          'NAME': 'ppa',
          'USER': 'root',
          'PASSWORD': 'root',
@@ -119,8 +119,13 @@ USE_L10N = True
 
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/2.2/howto/static-files/
-
+#setting.py 增加以下配置
 STATIC_URL = '/static/'
+HERE=os.path.dirname(os.path.dirname(__file__))
+STATIC_ROOT =os.path.join( HERE , 'static').replace('\\','/')
+STATICFILES_DIRS = (
+("assets", os.path.join(STATIC_ROOT,'images').replace('\\','/')),
+("css", os.path.join(STATIC_ROOT,'css').replace('\\','/')),
+("js", os.path.join(STATIC_ROOT,'js').replace('\\','/')),
+)
+#urls.py 增加以下配置

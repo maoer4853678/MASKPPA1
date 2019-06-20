@@ -1,49 +1,33 @@
 {% extends "base.html" %}
 
-{% block head %}
+{% block user %}
+<ul class="navbar-nav my-lg-0">
+    <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle text-muted waves-effect waves-dark" href="" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"><img src="../static/assets/images/users/1.jpg" alt="user" class="profile-pic m-r-10" />{{username}}</a>
+    </li>
+</ul>
 {% endblock %}
 
-
 {% block page %}
-<div class="col-xs-12 well">
-    <!-- left sidebar -->
-    <div class="col-xs-3" style="padding:10px">
-        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
-            请在这里进行参数配置:
-            <form action="" method='post'>
+            <div class="container-fluid">
+                <div class="row">
+                    <div class="form-group">
+                     <form action="" method='post'>
+                      <table>
+                        <tbody>
+                        {% csrf_token %}
+                        {{ form.as_table }}
+                        <tr>
+                            <td><input class="btn btn-success" type="submit" value="确定">
+                        </tr>
+                        </tbody>
+                      </table>
+                    </form>
+                    </div>
 
-                <table>
-                    <tbody>
-                    {% csrf_token %}
-                    {{ form.as_table }}
-                    <tr>
-                        <td><input type="submit" name="update" value="确定">
-                    </tr>
-                    </tbody>
-                </table>
-            </form>
-        </div>
-
-        {% if messages %}
-            <script>
-                {% for msg in messages %}
-                    alert('{{ msg.message }}');
-                {% endfor %}
-            </script>
-        {% endif %}
-
-        <div class="col-xs-12" style="height: 10px"></div>
-
-<!--         <div class="col-xs-12" style="background-color: #fff; border: 1px solid #afafaf; padding:10px; overflow: scroll; height: 400px">
-            All glasses:<br>
-            {{ all_glasses | safe }}
-        </div> -->
-    </div>
-
-    <div class="col-xs-9" style="padding:10px">
-        <div class="col-xs-12" style="background-color: #ffffff; border: 1px solid #afafaf; padding:10px">
-            <div class="col-md-12" id="plot_ppa" style="height: 320px"></div>
-        </div>
-    </div>
-</div>
+                    </div>
+                <div class="row">
+                    <label class="card-title m-t-10"> {{ message }} </label>
+                </div>
+            </div>
 {% endblock %}

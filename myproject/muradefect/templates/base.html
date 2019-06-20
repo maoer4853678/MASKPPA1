@@ -1,93 +1,177 @@
 <!DOCTYPE html>
-<html  lang="cn">
-	<head>
-		<meta charset="UTF-8">
-		<meta http-equiv="X-UA-Compatible" content="IE=edge">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<link rel="stylesheet" type="text/css" href="/static/css/bootstrap.css" >
-		<link rel="stylesheet" type="text/css" href="/static/css/sb-admin.css">
-		<link rel="stylesheet" type="text/css" href="/static/css/custom.css">
-		<link rel="stylesheet" type="text/css" href="/static/css/signin.css">
-		<link rel="stylesheet" type="text/css" href="/static/font-awesome/css/font-awesome.min.css" >
-		
-		<title>Sherk</title>
-		<link href="/static/img/favicon-.jpg" rel="shortcut icon">
-		<script src="/static/js/bootbox.min.js"></script>
-		<script src="/static/js/jquery.js"></script>
-		<script src="/static/js/tether.js"></script>
-		<script src="/static/js/echarts.js"></script>
-		<script src="/static/js/math.js"></script>
-		{% block head %}{% endblock %}
-	</head>
-	<body>
-		<div id="wrapper">
-			<!-- Navigation -->
-			<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
-				<!-- Brand and toggle get grouped for better mobile display -->
-				<div class="navbar-header">
-					<a class="navbar-brand" href="/">
-						<img src="/static/img/logo-k2.png" height = "100%">
-					</a>
-					<ul class="nav navbar-nav">
-						<li id="index" >
-							<a href="/"><i class="fa fa-fw fa-book"></i>Parameters</a>
-						</li>
-						<li id="plot" >
-							<a href="/plot"><i class="fa fa-fw fa-gear"></i>Plot</a>
-						</li>
-						<li id="glasses" >
-							<a href="/glasses"><i class="fa fa-fw fa-desktop"></i>Optimize</a>
-						</li>
-						<li id="" class="dropdown">
-							<a class="dropdown-toggle" data-toggle="dropdown"><i class="fa fa-fw fa-bars"></i>Reserved<b class="caret"></b></a>
-							<ul class="dropdown-menu">
-								<li>
-									<a href="#"><i class="fa fa-fw fa-desktop"></i>list-1</a>
-								</li>
-								<li class="divider"></li>
-								<li>
-									<a href="#"><i class="fa fa-fw fa-gear"></i>list-2</a>
-								</li>
-								<li class="divider"></li>
-								<li>
-									<a href="#"><i class="fa fa-fw fa-gear"></i>list-3</a>
-								</li>
-							</ul>
-						</li>
-					</ul>
-				</div>
-				<!-- Top Menu Items -->
-				<ul class="nav navbar-right top-nav">
-					<li class="dropdown">
-						<a href="#" class="dropdown-toggle" data-toggle="dropdown"><i class="fa fa-user"></i> {{context.username}} <b class="caret"></b></a>
-						<ul class="dropdown-menu">
-							<li>
-								<a href="/option"><i class="fa fa-fw fa-gear"></i>Option</a>
-							</li>
-							<li class="divider"></li>
-							<li>
-								<a href="/logout"><i class="fa fa-fw fa-power-off"></i>Logout</a>
-							</li>
-						</ul>
-					</li>
-				</ul>
-			</nav>
-		</div>
+<html lang="en">
 
-		<div id="container">
-			{% block page %}{% endblock %}
-		</div>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <!-- Tell the browser to be responsive to screen width -->
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <!-- Favicon icon -->
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon.png">
+    <title>OFFSET优化工具平台</title>
+    <!-- Bootstrap Core CSS -->
+    <link href="../static/assets/plugins/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+    <!-- chartist CSS -->
+    <link href="../static/assets/plugins/chartist-js/dist/chartist.min.css" rel="stylesheet">
+    <link href="../static/assets/plugins/chartist-js/dist/chartist-init.css" rel="stylesheet">
+    <link href="../static/assets/plugins/chartist-plugin-tooltip-master/dist/chartist-plugin-tooltip.css" rel="stylesheet">
+    <!--This page css - Morris CSS -->
+    <link href="../static/assets/plugins/c3-master/c3.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="../static/css/style.css" rel="stylesheet">
+    <!-- You can change the theme colors from here -->
+    <link href="../static/css/colors/blue.css" id="theme" rel="stylesheet">
+    <script src="../static/js/jquery.js"></script>
+    <script src="../static/js/select2.min.js"></script>
+     <link href="../static/css/select2.css" rel="stylesheet">
+    {% block header %}
+    {% endblock %}
+</head>
 
-		<div>
-			A test tool for Visionox OLED department. <br>
-			Author: Sherk Fung.<br>
-			Version: 1.1.0
-		</div>
 
-		<script src="/static/js/bootstrap.js"></script>
-        {% block script %}{% endblock %}
-	</body>
+<body class="fix-header fix-sidebar card-no-border">
+    <!-- ============================================================== -->
+    <!-- Preloader - style you can find in spinners.css -->
+    <!-- ============================================================== -->
+    <div class="preloader">
+        <svg class="circular" viewBox="25 25 50 50">
+            <circle class="path" cx="50" cy="50" r="20" fill="none" stroke-width="2" stroke-miterlimit="10" /> </svg>
+    </div>
+    <!-- ============================================================== -->
+    <!-- Main wrapper - style you can find in pages.scss -->
+    <!-- ============================================================== -->
+    <div id="main-wrapper">
+        <!-- ============================================================== -->
+        <!-- Topbar header - style you can find in pages.scss -->
+        <!-- ============================================================== -->
+        <header class="topbar">
+            <nav class="navbar top-navbar navbar-toggleable-sm navbar-light">
+                <!-- ============================================================== -->
+                <!-- Logo -->
+                <!-- ============================================================== -->
+                <div class="navbar-header">
+                    <a class="navbar-brand" href="/">
+                        <!-- Logo icon --><b>
+                            <!--You can put here icon as well // <i class="wi wi-sunset"></i> //-->
+                            
+                            <!-- Light Logo icon -->
+                            <!-- <img src="../static/assets/images/logo-light-icon.png" alt="homepage" class="light-logo" /> -->
+                        </b>
+                        <!--End Logo icon -->
+                        <!-- Logo text --><span>
+                         
+                         <!-- Light Logo text -->    
+                         <img src="../static/assets/images/logo-light-text.png" class="light-logo" alt="homepage" height="50" width="200"/></span> </a>
+                </div>
+                <!-- ============================================================== -->
+                <!-- End Logo -->
+                <!-- ============================================================== -->
+                <div class="navbar-collapse">
+                    <!-- ============================================================== -->
+                    <!-- toggle and nav items -->
+                    <!-- ============================================================== -->
+                    <ul class="navbar-nav mr-auto mt-md-0">
+                        <!-- This is  -->
+                        <li class="nav-item"> <a class="nav-link nav-toggler hidden-md-up text-muted waves-effect waves-dark" href="javascript:void(0)"><i class="mdi mdi-menu"></i></a> </li>
+                        <!-- ============================================================== -->
+                        <!-- Search -->
+                        <!-- ============================================================== -->
+                        <!-- <li class="nav-item hidden-sm-down search-box"> <a class="nav-link hidden-sm-down text-muted waves-effect waves-dark" href="javascript:void(0)"><i class="ti-search"></i></a>
+                            <form class="app-search">
+                                <input type="text" class="form-control" placeholder="Search & enter"> <a class="srh-btn"><i class="ti-close"></i></a> </form>
+                        </li> -->
+                    </ul>
+                    <!-- ============================================================== -->
+                    <!-- User profile and search -->
+                    <!-- ============================================================== -->
+                    {% block user %}
+                    {% endblock %}
+                </div>
+            </nav>
+        </header>
+        <!-- ============================================================== -->
+        <!-- End Topbar header -->
+        <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- Left Sidebar - style you can find in sidebar.scss  -->
+        <!-- ============================================================== -->
+        <aside class="left-sidebar">
+            <!-- Sidebar scroll-->
+            <div class="scroll-sidebar">
+                <!-- Sidebar navigation-->
+                <nav class="sidebar-nav">
+                    <ul id="sidebarnav">
+                        <li> <a class="waves-effect waves-dark" href="/" aria-expanded="false"><i class="mdi mdi-account-check"></i><span class="hide-menu">MASKID分析</span></a>
+                        </li>
+                        <li> <a class="waves-effect waves-dark" href="/offset" aria-expanded="false"><i class="mdi mdi-table"></i><span class="hide-menu">OFFSET优化结果</span></a>
+                        </li>
+                        <li> <a class="waves-effect waves-dark" href="/ppa" aria-expanded="false"><i class="mdi mdi-account-check"></i><span class="hide-menu">PPA优化前后对比</span></a>
+                        </li>
+                        <li> <a class="waves-effect waves-dark" href="/alarm" aria-expanded="false"><i class="mdi mdi-emoticon"></i><span class="hide-menu">报警记录</span></a>
+                        </li>
+                        <li> <a class="waves-effect waves-dark" href="/data" aria-expanded="false"><i class="mdi mdi-earth"></i><span class="hide-menu">数据概览</span></a>
+                        </li>
+                        <li> <a class="waves-effect waves-dark" href="/option" aria-expanded="false"><i class="mdi mdi-book-open-variant"></i><span class="hide-menu">配置页面</span></a>
+                        </li>
+                        <!-- li> <a class="waves-effect waves-dark" href="pages-error-404.html" aria-expanded="false"><i class="mdi mdi-help-circle"></i><span class="hide-menu">Error 404</span></a>
+                        </li>
+                    </ul>
+                    <div class="text-center m-t-30">
+                        <a href="#" class="btn waves-effect waves-light btn-warning hidden-md-down"> Upgrade to Pro</a>
+                    </div> -->
+                </nav>
+                <!-- End Sidebar navigation -->
+            </div>
+            <!-- End Sidebar scroll-->
+            <!-- Bottom points-->
+            <div class="sidebar-footer">
+                <!-- item--><a href="/option" class="link" data-toggle="tooltip" title="配置"><i class="ti-settings"></i>
+                <!-- item--><a href="/logout" class="link" data-toggle="tooltip" title="注销"><i class="mdi mdi-power"></i></a> </div>
+            <!-- End Bottom points-->
+        </aside>
+        <!-- ============================================================== -->
+        <!-- End Left Sidebar - style you can find in sidebar.scss  -->
+        <!-- ============================================================== -->
+        <!-- ============================================================== -->
+        <!-- Page wrapper  -->
+        <!-- ============================================================== -->
+        <div class="page-wrapper">
+            <!-- ============================================================== -->
+            <!-- Container fluid  -->
+            <!-- ============================================================== -->
+{% block page %}
+{% endblock %}
+            <!-- ============================================================== -->
+            <!-- End Container fluid  -->
+            <!-- ============================================================== -->
+            <!-- ============================================================== -->
+            <!-- footer -->
+            <!-- ============================================================== -->
+            <!-- <footer class="footer">Copyright &copy; 2019.K2DATA All rights reserved.</footer> -->
+            <!-- ============================================================== -->
+            <!-- End footer -->
+            <!-- ============================================================== -->
+        </div>
+        <!-- ============================================================== -->
+        <!-- End Page wrapper  -->
+        <!-- ============================================================== -->
+    </div>
 
-{% block console %}{% endblock %}
+    
+    <script src="../static/assets/plugins/bootstrap/js/tether.min.js"></script>
+    <script src="../static/assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script src="../static/js/jquery.slimscroll.js"></script>
+    <script src="../static/js/waves.js"></script>
+    <script src="../static/js/sidebarmenu.js"></script>
+    <script src="../static/assets/plugins/sticky-kit-master/dist/sticky-kit.min.js"></script>
+    <script src="../static/js/custom.min.js"></script>
+    <script src="../static/assets/plugins/d3/d3.min.js"></script>
+    <script src="../static/assets/plugins/c3-master/c3.min.js"></script>
+    <script src="../static/js/dashboard1.js"></script>
+    <script src="../static/assets/plugins/chartist-js/dist/chartist.min.js"></script>
+    <script src="../static/assets/plugins/chartist-plugin-tooltip-master/dist/chartist-plugin-tooltip.min.js"></script>
+</body>
 
 </html>

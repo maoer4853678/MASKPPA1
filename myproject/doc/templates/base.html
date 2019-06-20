@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html  lang="cn">
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<link rel="stylesheet" type="text/css" href="/static/css/bootstrap.css" >
+		<link rel="stylesheet" type="text/css" href="/static/css/sb-admin.css">
+		<link rel="stylesheet" type="text/css" href="/static/css/custom.css">
+		<link rel="stylesheet" type="text/css" href="/static/css/signin.css">
+		<link rel="stylesheet" type="text/css" href="/static/font-awesome/css/font-awesome.min.css" >
+		
+		<title>Sherk</title>
+		<link href="/static/img/favicon-.jpg" rel="shortcut icon">
+		<script src="/static/js/bootbox.min.js"></script>
+		<script src="/static/js/jquery.js"></script>
+		<script src="/static/js/tether.js"></script>
+		<script src="/static/js/echarts.js"></script>
+		<script src="/static/js/math.js"></script>
+		{% block head %}{% endblock %}
+	</head>
+	<body>
+		<div id="wrapper">
+			<!-- Navigation -->
+			<nav class="navbar navbar-inverse navbar-fixed-top" role="navigation">
+				<!-- Brand and toggle get grouped for better mobile display -->
+				<div class="navbar-header">
+					<a class="navbar-brand" href="/">
+						<img src="/static/img/logo-k2.png" height = "100%">
+					</a>
+					<ul class="nav navbar-nav">
+						<li id="index" >
+							<a href="/"><i class="fa fa-fw fa-book"></i>Parameters</a>
+						</li>
+						<li id="plot" >
+							<a href="/plot"><i class="fa fa-fw fa-gear"></i>Plot</a>
+						</li>
+						<li id="glasses" >
+							<a href="/glasses"><i class="fa fa-fw fa-desktop"></i>Optimize</a>
+						</li>
+						<li id="" class="dropdown">
+							<a class="dropdown-toggle" data-toggle="dropdown"><i class="fa fa-fw fa-bars"></i>Reserved<b class="caret"></b></a>
+							<ul class="dropdown-menu">
+								<li>
+									<a href="#"><i class="fa fa-fw fa-desktop"></i>list-1</a>
+								</li>
+								<li class="divider"></li>
+								<li>
+									<a href="#"><i class="fa fa-fw fa-gear"></i>list-2</a>
+								</li>
+								<li class="divider"></li>
+								<li>
+									<a href="#"><i class="fa fa-fw fa-gear"></i>list-3</a>
+								</li>
+							</ul>
+						</li>
+					</ul>
+				</div>
+				<!-- Top Menu Items -->
+				<ul class="nav navbar-right top-nav">
+					<li class="dropdown">
+						<a href="#" class="dropdown-toggle" data-toggle="dropdown"><i class="fa fa-user"></i> {{context.username}} <b class="caret"></b></a>
+						<ul class="dropdown-menu">
+							<li>
+								<a href="/option"><i class="fa fa-fw fa-gear"></i>Option</a>
+							</li>
+							<li class="divider"></li>
+							<li>
+								<a href="/logout"><i class="fa fa-fw fa-power-off"></i>Logout</a>
+							</li>
+						</ul>
+					</li>
+				</ul>
+			</nav>
+		</div>
+
+		<div id="container">
+			{% block page %}{% endblock %}
+		</div>
+
+		<div>
+			A test tool for Visionox OLED department. <br>
+			Author: Sherk Fung.<br>
+			Version: 1.1.0
+		</div>
+
+		<script src="/static/js/bootstrap.js"></script>
+        {% block script %}{% endblock %}
+	</body>
+
+{% block console %}{% endblock %}
+
+</html>

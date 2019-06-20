@@ -10,7 +10,7 @@ Any question please refer to:
 """
 
 from sqlalchemy import create_engine
-#from my2sql import Mysql
+from my2sql import Mysql
 
 # connection to local postgresql
 args = {}
