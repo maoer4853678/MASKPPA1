@@ -1,15 +1,7 @@
 from django import forms
 import configparser
 import os
-
-CONFIGROOT = './muradefect/static/conf'
-
-def GetSP(CONFIGROOT):
-    ## 数据筛选的主要属性 和 数据库连接信息
-    config=configparser.ConfigParser()
-    config.read(os.path.join(CONFIGROOT,'conf.ini'))
-    settings = dict(config['settings'].items())
-    return settings
+from .usercore import *
 
 class AddForm(forms.Form):
     exp_label = forms.IntegerField()

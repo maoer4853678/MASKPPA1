@@ -9,25 +9,31 @@
 {% endblock %}
 
 {% block page %}
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="form-group">
-                     <form action="" method='post'>
-                      <table>
-                        <tbody>
-                        {% csrf_token %}
-                        {{ form.as_table }}
-                        <tr>
-                            <td><input class="btn btn-success" type="submit" value="确定">
-                        </tr>
-                        </tbody>
-                      </table>
-                    </form>
-                    </div>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="form-group">
+             <form action="" method='post'>
+              <table>
+                <tbody>
+                {% csrf_token %}
+                {{ form.as_table }}
+                <tr>
+                    <td><input class="btn btn-success" type="submit" value="确定">
+                </tr>
+                </tbody>
+              </table>
+            </form>
+          </div>
+        </div>
 
-                    </div>
-                <div class="row">
-                    <label class="card-title m-t-10"> {{ message }} </label>
-                </div>
-            </div>
+        <label class="card-title m-t-10" id = "message" style="color: red"> 
+               {{ message }} 
+        </label>
+    </div>
+
+
+<script type="text/javascript">
+    // $("#message").css('color', 'red')
+</script >
+
 {% endblock %}

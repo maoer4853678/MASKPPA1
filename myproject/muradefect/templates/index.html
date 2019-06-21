@@ -2,8 +2,12 @@
 
 {% block header %}
 <script src="../static/js/echarts.js"></script>
+<link href="../static/css/bootstrap-select.css" rel="stylesheet">
+<script src="../static/js/bootstrap-select.js"></script>
+<script src="../static/js/i18n/defaults-zh_CN.min.js"></script>
 <script src="../static/js/select2.min.js"></script>
 <link href="../static/css/select2.css" rel="stylesheet">
+
 
 {% endblock %}
 {% block user %}
@@ -17,27 +21,44 @@
 {% block page %}
             <div class="container-fluid">
                 {% csrf_token %}
-                <div class="row">
-                    <label class="breadcrumb">产品名称</label>
+
+                 <div class="row">
+
+                <label class="breadcrumb">产品名称</label>
                     <div class="breadcrumb">
-                    <select style="width: 230px" id="productselect">
+                    <select style="width: 200px" id="productselect" >
                         {% for product in products %}
                             <option>{{ product }}</option>
                         {% endfor %} 
                     </select>
                 </div>
-                
-                    <label class="breadcrumb">MASK套别</label>
-                    <div class="breadcrumb">
-                    <select style="width: 100px"  id="maskselect"
-                     >
-                        {% for maskset in masksets %}
-                            <option>{{ maskset }}</option>
+
+                <label class="breadcrumb">MASK套别</label>
+                    <div class="breadcrumb" >
+                    <select style="width: 200px"  id="maskset" >
+                        {% for product in products %}
+                            <option>{{ product }}</option>
+                        {% endfor %} 
+                    </select>
+                </div>
+
+                 <label class="breadcrumb">MASKID</label>
+                 <div class="breadcrumb">
+                     <select id='maskselect' style="width: 600px" multiple="true">
+                        {% for maskid in maskids %}
+                            <option value= "{{ maskid }} " > {{ maskid }} </option>
                         {% endfor %} 
                     </select>
                 </div>
                
-                       <label class="breadcrumb">起始时间</label>
+                <div class="breadcrumb">
+                     <a  class="btn waves-effect waves-light btn-warning hidden-md-down"  id = "save"> 保存为新套别 </a>
+                </div>
+
+                </div>
+
+                <div class="row">
+                  <label class="breadcrumb">起始时间</label>
                 <div class="breadcrumb">
                      <input type="date" id="datetimeStart" class="form-control"/>
                </div>
@@ -47,8 +68,7 @@
                     <input type="date" id="datetimeEnd" class="form-control"/>
                 </div>
 
-                
-                <div class="breadcrumb">
+                 <div class="breadcrumb">
                      <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
                 </div>
                 </div>
@@ -75,171 +95,217 @@
                     <div id="chart6" style="width: 500px;height:300px;"></div>
                     </div>
                 </div>
+  </div>
 
-            <script type="text/javascript">
-                    function getDay(day){
-                    　　var today = new Date();
-                    　　var targetday_milliseconds=today.getTime() + 1000*60*60*24*day;
-                    　　today.setTime(targetday_milliseconds); 
-                    　　var tYear = today.getFullYear();
-                    　　var tMonth = today.getMonth();
-                    　　var tDate = today.getDate();
-                    　　tMonth = doHandleMonth(tMonth + 1);
-                    　　tDate = doHandleMonth(tDate);
-                    　　return tYear+"-"+tMonth+"-"+tDate;
-                    }
-                     
-                    function doHandleMonth(month){
-                    　　var m = month;
-                    　　if(month.toString().length == 1){
-                    　　　　m = "0" + month;
-                    　　}
-                    　　return m;
-                    }
-            </script>
+<script type="text/javascript">
 
-                <script type="text/javascript">
-                // 基于准备好的dom，初始化echarts实例
-                var alldata = {{data|safe}}
-                var option = {
-                    title: {
-                        text: ''
-                    },
-                    tooltip: {
-                        trigger: 'axis'
-                    },
-                    legend: {
-                        show:true,
-                        data:['PPA_X','PPA_Y']
-                    },
-                    grid: {
-                        left: '3%',
-                        right: '4%',
-                        bottom: '10%',
-                        containLabel: true
-                    },
-                    dataZoom: [
-                        {
-                            type: 'slider',
-                            xAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'slider',
-                            yAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'inside',
-                            xAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'inside',
-                            yAxisIndex: 0,
-                            filterMode: 'empty'
-                        }
-                    ],
-                    toolbox: {
-                        show: true,
-                        feature: {
-                            dataZoom: {},
-                            dataView: {readOnly: false},
-                            magicType: {type: ['line', 'bar']},
-                            restore: {},
-                            saveAsImage: {}
-                        }
-                    },
-                    xAxis: {
-                        name:"GLASSID",
-                        type: 'category',
-                        data: [],
-                        min : "dataMin",
-                        max : "dataMax"
-                    },
-                    yAxis: {
-                        name:"合格率",
-                        type: 'value',
-                         min : "dataMin",
-                        max : "dataMax"
-                    },
-                    series: [
-                        {
-                            name:'PPA_X',
-                            type:'line',
-                            data:[]
-                        },
-                        {
-                            name:'PPA_Y',
-                            type:'line',
-                            data:[]
-                        }
-                    ]
-                };
+reset = function () {
+alertify.set({
+labels : {
+ok : "确认",
+cancel : "取消"
+},
+delay : 5000,
+buttonReverse : false,
+buttonFocus : "ok"
+});
+};
+
+$("#save").click(function () {
+   maskids = $("#maskselect").select2('val')
+   if (maskids.length!=0)
+   {
+    alertify.prompt("请输入MASK套别名称","",
+     function (e, msg) 
+    {
+     if (msg==''){
+        alertify.error("保存失败: 套别名称不能为空")
+     }
+     else{
+        // 储存文件 至 msg中  调用接口回传 后台
+        if (e) {alertify.success("保存成功 : " + msg)} 
+        else {alertify.error("保存失败 ")}}}).set({title:"添加MASK"}).set({labels:{ok:'确定', cancel: '取消'}});
+   }
+   else
+   {
+    alertify.error("保存失败: MASKID未选中")
+   }
+})
+
+$("#maskselect").select2({
+        theme: "classic",
+        placeholder: "请选择MASKID",
+        language : "zh-CN",
+        minimumInputLength : 0,
+        allowClear: true,
+         closeOnSelect:false
+    })
+
+$("#productselect").select2()
+$("#maskset").select2()
+
+function getDay(day){
+　　var today = new Date();
+　　var targetday_milliseconds=today.getTime() + 1000*60*60*24*day;
+　　today.setTime(targetday_milliseconds); 
+　　var tYear = today.getFullYear();
+　　var tMonth = today.getMonth();
+　　var tDate = today.getDate();
+　　tMonth = doHandleMonth(tMonth + 1);
+　　tDate = doHandleMonth(tDate);
+　　return tYear+"-"+tMonth+"-"+tDate;
+}
  
-                function FreshData()
-                {
-                    var charts = ['chart1','chart2','chart3','chart4','chart5','chart6']
-                    for (var i = 0; i < charts.length; i++) {
-                        var myChart = echarts.init(document.getElementById(charts[i]));
-                        if (i>= alldata.length)
-                        {
-                            option.title.text = ''
-                            option.series[0].data = []
-                            option.series[1].data = []
-                        }
-                        else
-                        {
-                         item = alldata[i]
-                        option.title.text = item.mask_id    
-                        option.xAxis.data = item.glass_id
-                        option.series[0].data = item.ppa_x
-                        option.series[1].data= item.ppa_y
-                         }
-                        myChart.setOption(option);        
-                    }
-                }
+function doHandleMonth(month){
+　　var m = month;
+　　if(month.toString().length == 1){
+　　　　m = "0" + month;
+　　}
+　　return m;
+}
+</script>
+
+<script type="text/javascript">
+// 基于准备好的dom，初始化echarts实例
+var alldata = {{data|safe}}
+var option = {
+title: {
+    text: ''
+},
+tooltip: {
+    trigger: 'axis'
+},
+legend: {
+    show:true,
+    data:['PPA_X','PPA_Y']
+},
+grid: {
+    left: '3%',
+    right: '4%',
+    bottom: '10%',
+    containLabel: true
+},
+dataZoom: [
+    {
+        type: 'slider',
+        xAxisIndex: 0,
+        filterMode: 'empty'
+    },
+    {
+        type: 'slider',
+        yAxisIndex: 0,
+        filterMode: 'empty'
+    },
+    {
+        type: 'inside',
+        xAxisIndex: 0,
+        filterMode: 'empty'
+    },
+    {
+        type: 'inside',
+        yAxisIndex: 0,
+        filterMode: 'empty'
+    }
+],
+toolbox: {
+    show: true,
+    feature: {
+        dataZoom: {},
+        dataView: {readOnly: false},
+        magicType: {type: ['line', 'bar']},
+        restore: {},
+        saveAsImage: {}
+    }
+},
+xAxis: {
+    name:"GLASSID",
+    type: 'category',
+    data: [],
+    min : "dataMin",
+    max : "dataMax"
+},
+yAxis: {
+    name:"合格率",
+    type: 'value',
+     min : "dataMin",
+    max : "dataMax"
+},
+series: [
+    {
+        name:'PPA_X',
+        type:'line',
+        data:[]
+    },
+    {
+        name:'PPA_Y',
+        type:'line',
+        data:[]
+    }
+]
+};
+
+function FreshData()
+{
+var charts = ['chart1','chart2','chart3','chart4','chart5','chart6']
+for (var i = 0; i < charts.length; i++) {
+    var myChart = echarts.init(document.getElementById(charts[i]));
+    if (i>= alldata.length)
+    {
+        option.title.text = ''
+        option.series[0].data = []
+        option.series[1].data = []
+    }
+    else
+    {
+     item = alldata[i]
+    option.title.text = item.mask_id    
+    option.xAxis.data = item.glass_id
+    option.series[0].data = item.ppa_x
+    option.series[1].data= item.ppa_y
+     }
+    myChart.setOption(option);        
+}
+}
+
+FreshData()
+
+endtime=  getDay(0)
+starttime = getDay(-7)
+console.log(starttime,"starttime")
+datetimeStart = document.getElementById("datetimeStart")
+datetimeEnd = document.getElementById("datetimeEnd")
+datetimeStart.value=starttime
+datetimeEnd.value=endtime
+
+
+$("#ensure").click(function () {
+var $formData=new FormData();
+$formData.append("starttime",$("#datetimeStart").val());
+$formData.append("endtime",$("#datetimeEnd").val());
+$formData.append("productselect",$("#productselect").val());
+$formData.append("maskselect",$("#maskselect").val());
+
+$.ajax({
+    url:"/getppa",
+    type:"POST",
+    data:$formData,
+    contentType:false,
+    processData:false,
+    headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+    success:function (data) {
+            if (data.length==0){
+                alertify.error("未发现符合条件数据 ")
+            }
+            else {
+                alldata = data
                 FreshData()
-                
-                $("#productselect").select2()
-                $("#maskselect").select2()
-                
-                         
-                endtime=  getDay(0)
-                starttime = getDay(-7)
-                console.log(starttime,"starttime")
-                datetimeStart = document.getElementById("datetimeStart")
-                datetimeEnd = document.getElementById("datetimeEnd")
-                datetimeStart.value=starttime
-                datetimeEnd.value=endtime
+            }
+    }
+})
+})
 
-                $("#ensure").click(function () {
-                    var $formData=new FormData();
-                    $formData.append("starttime",$("#datetimeStart").val());
-                    $formData.append("endtime",$("#datetimeEnd").val());
-                    $formData.append("productselect",$("#productselect").val());
-                    $formData.append("maskselect",$("#maskselect").val());
-                    $.ajax({
-                        url:"/getppa",
-                        type:"POST",
-                        data:$formData,
-                        contentType:false,
-                        processData:false,
-                        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
-                        success:function (data) {
-                                if (data.length==0){
-                                    alert("未发现符合条件数据")
-                                }
-                                else {
-                                    alldata = data
-                                    FreshData()
-                                }
-                        }
-                    })
-                    })
-
-                  // $("#ensure").click()  // 页面初始化后自动执行一次
-                </script>
+// $("#ensure").click()  // 页面初始化后自动执行一次
+</script>
 
             </div>
 {% endblock %}

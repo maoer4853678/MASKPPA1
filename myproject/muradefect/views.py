@@ -5,57 +5,31 @@ from django.template import RequestContext
 from django.contrib import messages
 from django.views.decorators.csrf import csrf_exempt
 from .models import User
-import json,os,configparser
+import json,os
+from .usercore import *
 
 from .forms import AddForm, GlassForm, GlassPlotForm,OptionForm,RegisterForm
 #from .utils_db import db
-from django.db import connection as conn
+#from django.db import connection as conn
 from .optimize_offset_threshold import cal_optimized_offset, plot_data
 import pandas as pd
 from imp import reload
 import datetime
 
-CONFIGROOT = './muradefect/static/conf'
-
+conn = GetConn()
 ################################################## 通用函数 ##############################################
-def GetRole(user):
-    admins = ['admin']
-
-def GetDataBase(CONFIGROOT):
-    ## 数据筛选的主要属性 和 数据库连接信息
-    config=configparser.ConfigParser()
-    config.read(os.path.join(CONFIGROOT,'conf.ini'))
-    database = dict(config['datebase2'].items())
-    return database
-
-def GetSP(CONFIGROOT):
-    ## 数据筛选的主要属性 和 数据库连接信息
-    config=configparser.ConfigParser()
-    config.read(os.path.join(CONFIGROOT,'conf.ini'))
-    settings = dict(config['settings'].items())
-    return settings
-
-def SetSP(CONFIGROOT,settings):
-    ## 数据筛选的主要属性 和 数据库连接信息
-    config=configparser.ConfigParser()
-    config.read(os.path.join(CONFIGROOT,'conf.ini'))
-    for key,value in settings.items():
-        config.set('settings',key,str(value))
-    with open(os.path.join(CONFIGROOT,'conf.ini'),'w') as configfile:
-        config.write(configfile)
-
 def GetProducts():
-    data = pd.read_sql_query("select distinct product_id,mask_set from eva_all ",con=conn)
+    data = pd.read_sql_query("select distinct product_id,mask_id from eva_all ",con=conn.obj.conn)
     products = data.product_id.sort_values().unique().tolist()
-    masksets = data.mask_set.sort_values().unique().tolist()
-    return products,masksets
+    maskids = data.mask_id.sort_values().unique().tolist()
+    return products,maskids
 
 def GetPpaData(starttime,endtime,product,maskset):
     data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id from eva_all \
                              where eventtime >='%s' and eventtime <= '%s' \
                              and product_id = '%s' and mask_set = '%s' \
                              "%(starttime,endtime,\
-                             product,maskset),con=conn)
+                             product,maskset),con=conn.obj.conn)
     th = 6.5
     res = []
     for mask_id in data.mask_id.unique():
@@ -203,7 +177,7 @@ def GetOpsPpa(request):
     data = pd.read_sql_query("select ppa_x,ppa_y,offset_x,offset_y, offset_tht, \
                              x_label,y_label,pos_x,pos_y  from eva_all where \
                              glass_id = '%s' and eva_chamber = '%s' \
-                             "%(glassid,chamber), con=conn)
+                             "%(glassid,chamber), con=conn.obj.conn)
     
     adf = PlotAfterData(data)
     bdf = PlotBeforeData(data)
@@ -215,10 +189,10 @@ def GetOpsPpa(request):
 def index(request):
     username=  request.session.get("username")
     if username:
-        products,masksets = GetProducts()
+        products,maskids = GetProducts()
 #        res = GetPpaData(starttime,endtime,products[0],masksets[0])
         return render(request, 'index.html', {'username': username,\
-          "products":products,"masksets":masksets,"data":'[]'})
+          "products":products,"maskids":maskids,"data":'[]'})
     else:
         return redirect('/login')
 
@@ -228,12 +202,17 @@ def Option(request):
     settings =  GetSP(CONFIGROOT)
     form = OptionForm(settings)
     if request.method == 'POST':
-        form = OptionForm(request.POST)
-        if form.is_valid():
-            SetSP(CONFIGROOT,form.cleaned_data)
-            return render(request, 'option.html', {'username': username,"form":form,"message":"设置成功"})
-    
-    return render(request, 'option.html', {'username': username,"form":form})
+        if GetRole(username):
+            form = OptionForm(request.POST)
+            if form.is_valid():
+                SetSP(CONFIGROOT,form.cleaned_data)
+                return render(request, 'option.html', {'username': username,"form":form,\
+                                                       "message":"设置成功","status":200})
+        else:
+            return render(request, 'option.html', {'username': username,"form":form,\
+                                                   "message":"设置失败, 你不是管理员账户","status":400})
+        
+    return render(request, 'option.html', {'username': username,"form":form,"status":200})
 
 @need_logged_in
 def Offset(request):
@@ -247,7 +226,7 @@ def Offset(request):
 @need_logged_in
 def Ppa(request):
     username=  request.session.get("username")
-    data = pd.read_sql_query("select distinct glass_id,eva_chamber from eva_all", con=conn)
+    data = pd.read_sql_query("select distinct glass_id,eva_chamber from eva_all", con=conn.obj.conn)
     glassids = data.glass_id.sort_values().unique().tolist()
     chambers = data.eva_chamber.sort_values().unique().tolist()
     return render(request, 'ppa.html',{'username': username,"glassids":glassids,"chambers":chambers,\
@@ -256,7 +235,7 @@ def Ppa(request):
 @need_logged_in
 def Alarm(request):
     username=  request.session.get("username")
-    df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn)
+    df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
     data,fields = GenerateTable(df)
     return render(request, 'alarm.html',{'username': username,"data":json.dumps(data),\
                  "fields":json.dumps(fields)})
@@ -264,21 +243,12 @@ def Alarm(request):
 @need_logged_in
 def Data(request):
     username=  request.session.get("username")
-    df = pd.read_sql_query("select * from eva_all ORDER BY EVENTTIME DESC limit 500 ",con = conn)
+    df = pd.read_sql_query("select * from eva_all ORDER BY EVENTTIME DESC limit 500 ",con = conn.obj.conn)
     df = df.drop(['x_label','y_label'],axis=1)
+    print ('debug',1)
     data,fields = GenerateTable(df)
-    
-    msg = json.dumps(data)
-    with open("data.json","w") as f:
-        f.write(msg)
-    f.close()
-    
-    msg1 = json.dumps(fields)
-    with open("fields.json","w") as f:
-        f.write(msg1)
-    f.close()
-#     
-    return render(request, 'data.html',{'username': username,"data":json.dumps(data[:5]),\
+    print ('debug',2)
+    return render(request, 'data.html',{'username': username,"data":json.dumps(data),\
                  "fields":json.dumps(fields)})
 
     
