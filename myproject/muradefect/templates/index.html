@@ -55,27 +55,24 @@
 
                 <div class="row">
                     <div class="breadcrumb">
-                    <div id="chart1" style="width: 750px;height:400px"></div>
+                    <div id="chart1" style="width: 500px;height:300px"></div>
                     </div>
                     <div class="breadcrumb">
-                    <div id="chart2" style="width: 750px;height:400px;"></div>
+                    <div id="chart2" style="width: 500px;height:300px;"></div>
                     </div>
-                </div>
-                <div class="breadcrumb"> </div>
+                    <div class="breadcrumb">
+                    <div id="chart3" style="width: 500px;height:300px"></div>
+                    </div>
+
                 <div class="row">
                     <div class="breadcrumb">
-                    <div id="chart3" style="width: 750px;height:400px"></div>
+                    <div id="chart4" style="width: 500px;height:300px;"></div>
                     </div>
                     <div class="breadcrumb">
-                    <div id="chart4" style="width: 750px;height:400px;"></div>
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="breadcrumb">
-                    <div id="chart5" style="width: 750px;height:400px"></div>
+                    <div id="chart5" style="width: 500px;height:300px"></div>
                     </div>
                     <div class="breadcrumb">
-                    <div id="chart6" style="width: 750px;height:400px;"></div>
+                    <div id="chart6" style="width: 500px;height:300px;"></div>
                     </div>
                 </div>
 
@@ -183,13 +180,22 @@
                 function FreshData()
                 {
                     var charts = ['chart1','chart2','chart3','chart4','chart5','chart6']
-                    for (var i = 0; i < alldata.length; i++) {
+                    for (var i = 0; i < charts.length; i++) {
                         var myChart = echarts.init(document.getElementById(charts[i]));
-                        item = alldata[i]
+                        if (i>= alldata.length)
+                        {
+                            option.title.text = ''
+                            option.series[0].data = []
+                            option.series[1].data = []
+                        }
+                        else
+                        {
+                         item = alldata[i]
                         option.title.text = item.mask_id    
                         option.xAxis.data = item.glass_id
                         option.series[0].data = item.ppa_x
                         option.series[1].data= item.ppa_y
+                         }
                         myChart.setOption(option);        
                     }
                 }
@@ -232,7 +238,7 @@
                     })
                     })
 
-                  $("#ensure").click()  // 页面初始化后自动执行一次
+                  // $("#ensure").click()  // 页面初始化后自动执行一次
                 </script>
 
             </div>

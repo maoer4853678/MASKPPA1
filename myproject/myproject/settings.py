@@ -25,7 +25,7 @@ SECRET_KEY = 'abwg#ajfesa+5qw^q4basopg0y5)duny*=l-k$wl^=u6bp(xqx'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['10.1.50.1','10.68.140.15','127.0.0.1'] 
+ALLOWED_HOSTS = ['10.1.50.1','10.68.140.15','127.0.0.1','10.68.2.38'] 
 
 # Application definition
 
@@ -78,10 +78,10 @@ DATABASES = {
     'default': {
          'ENGINE': 'django.db.backends.postgresql',
          'NAME': 'ppa',
-         'USER': 'root',
-         'PASSWORD': 'root',
-         'HOST': '127.0.0.1',
-         'PORT': '5432',
+         'USER': 'k2data',
+         'PASSWORD': 'K2data1234',
+         'HOST': '10.68.2.182',
+         'PORT': '30012',
          #'CONN_MAX_AGE': 5,
      }
 }

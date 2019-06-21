@@ -18,6 +18,9 @@ import datetime
 CONFIGROOT = './muradefect/static/conf'
 
 ################################################## 通用函数 ##############################################
+def GetRole(user):
+    admins = ['admin']
+
 def GetDataBase(CONFIGROOT):
     ## 数据筛选的主要属性 和 数据库连接信息
     config=configparser.ConfigParser()
@@ -41,14 +44,11 @@ def SetSP(CONFIGROOT,settings):
     with open(os.path.join(CONFIGROOT,'conf.ini'),'w') as configfile:
         config.write(configfile)
 
-def GetProducts(starttime,endtime):
-    data = pd.read_sql_query("select distinct product_id,mask_set,\
-                             mask_id from eva_all where eventtime >='%s'\
-                             and eventtime <= '%s' "%(starttime,\
-                             endtime),con=conn)
-    products = data.product_id.unique().tolist()
-    masksets = data.mask_set.unique().tolist()
-    return data,products,masksets
+def GetProducts():
+    data = pd.read_sql_query("select distinct product_id,mask_set from eva_all ",con=conn)
+    products = data.product_id.sort_values().unique().tolist()
+    masksets = data.mask_set.sort_values().unique().tolist()
+    return products,masksets
 
 def GetPpaData(starttime,endtime,product,maskset):
     data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id from eva_all \
@@ -86,6 +86,8 @@ def GenerateTable(df):
     w = pd.concat([w1,w2])+30 ## 4是 宽度折算系数  
     df1['width'] = df1['name'].map(w.to_dict())    
 #    df1['width'] = 40
+    df1['align'] =  "center"
+    df1['hide'] = True
     fields = list(df1.T.to_dict().values())
     data = list(df.T.to_dict().values())
     return data,fields
@@ -213,11 +215,7 @@ def GetOpsPpa(request):
 def index(request):
     username=  request.session.get("username")
     if username:
-        format = "%Y-%m-%d %H:%M:%S"
-        endtime = datetime.datetime.now()
-        starttime = endtime-datetime.timedelta(days=7)
-        data,products,masksets = GetProducts(starttime.strftime(format),\
-                                             endtime.strftime(format))
+        products,masksets = GetProducts()
 #        res = GetPpaData(starttime,endtime,products[0],masksets[0])
         return render(request, 'index.html', {'username': username,\
           "products":products,"masksets":masksets,"data":'[]'})
@@ -250,8 +248,8 @@ def Offset(request):
 def Ppa(request):
     username=  request.session.get("username")
     data = pd.read_sql_query("select distinct glass_id,eva_chamber from eva_all", con=conn)
-    glassids = data.glass_id.unique().tolist()
-    chambers = data.eva_chamber.unique().tolist()
+    glassids = data.glass_id.sort_values().unique().tolist()
+    chambers = data.eva_chamber.sort_values().unique().tolist()
     return render(request, 'ppa.html',{'username': username,"glassids":glassids,"chambers":chambers,\
                   "alldata":{}})
 
@@ -269,9 +267,22 @@ def Data(request):
     df = pd.read_sql_query("select * from eva_all ORDER BY EVENTTIME DESC limit 500 ",con = conn)
     df = df.drop(['x_label','y_label'],axis=1)
     data,fields = GenerateTable(df)
-    return render(request, 'data.html',{'username': username,"data":json.dumps(data),\
+    
+    msg = json.dumps(data)
+    with open("data.json","w") as f:
+        f.write(msg)
+    f.close()
+    
+    msg1 = json.dumps(fields)
+    with open("fields.json","w") as f:
+        f.write(msg1)
+    f.close()
+#     
+    return render(request, 'data.html',{'username': username,"data":json.dumps(data[:5]),\
                  "fields":json.dumps(fields)})
 
+    
+    
 #def plot(request):
 #    p1 = pd.read_csv("./muradefect/data/EVA_ALL.csv")
 #    p1['EVENTTIME'] = pd.to_datetime(p1['EVENTTIME'])
