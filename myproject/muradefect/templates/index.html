@@ -27,34 +27,30 @@
                 <label class="breadcrumb">产品名称</label>
                     <div class="breadcrumb">
                     <select style="width: 200px" id="productselect" >
-                        {% for product in products %}
-                            <option>{{ product }}</option>
-                        {% endfor %} 
                     </select>
                 </div>
 
                 <label class="breadcrumb">MASK套别</label>
-                    <div class="breadcrumb" >
+                <div class="breadcrumb" >
                     <select style="width: 200px"  id="maskset" >
-                        {% for product in products %}
-                            <option>{{ product }}</option>
-                        {% endfor %} 
                     </select>
                 </div>
 
                  <label class="breadcrumb">MASKID</label>
                  <div class="breadcrumb">
-                     <select id='maskselect' style="width: 600px" multiple="true">
-                        {% for maskid in maskids %}
-                            <option value= "{{ maskid }} " > {{ maskid }} </option>
-                        {% endfor %} 
+                     <select id='maskselect' style="width: 600px" multiple = "true">
                     </select>
                 </div>
                
                 <div class="breadcrumb">
+                    <div class="row">
                      <a  class="btn waves-effect waves-light btn-warning hidden-md-down"  id = "save"> 保存为新套别 </a>
+                     </div>
                 </div>
 
+
+                <div class="breadcrumb">
+                <a  class="btn waves-effect waves-light btn-warning hidden-md-down" style="color: red"  id = "delete"> 删除 </a>
                 </div>
 
                 <div class="row">
@@ -98,8 +94,7 @@
   </div>
 
 <script type="text/javascript">
-
-reset = function () {
+reset = function () {  //  alertify 窗口初始化
 alertify.set({
 labels : {
 ok : "确认",
@@ -111,19 +106,101 @@ buttonFocus : "ok"
 });
 };
 
-$("#save").click(function () {
-   maskids = $("#maskselect").select2('val')
+addoption = function(id,options){
+    $(id).empty();
+    for (var i = 0; i < options.length; i++) {
+        var option = new Option(options[i], options[i], true, false);
+        $(id).append(option);
+    }
+}
+
+var masksetdict = {{masksetdict|safe}}  // {"Product":{"MaskSet":["maskid"]}}
+var productdict = {{productdict|safe}}  // {"Product":["maskid"]}
+
+// 初始化productselect控件
+addoption("#productselect",Object.keys(productdict)) 
+$("#productselect").select2()
+// 设置productselect change事件, 初始化maskset 和 maskids
+$("#productselect").on("change", function(e) 
+{
+    // 初始化 maskids 控件
+    $("#maskselect").select2({
+        theme: "classic",
+        language : "zh-CN",
+        minimumInputLength : 0,
+        allowClear: true,
+        closeOnSelect:false,
+    })
+    addoption("#maskselect",productdict[$("#productselect").val()]) 
+    $("#maskselect").select2({placeholder: "请选择MASKID"})
+
+    // 初始化 maskset 控件
+    $("#maskset").select2({
+        theme: "classic",
+        language : "zh-CN",
+    })
+    var masksets = masksetdict[$("#productselect").val()]
+    if (masksets){
+        masklist = Object.keys(masksets)
+    }
+    else{
+        masklist = []
+    }
+
+    $("#maskset").select2("data",null)
+    addoption("#maskset",masklist) 
+    $("#maskset").on("change", function(e) {
+        var newmaskids = []
+        masklist = masksetdict[$("#productselect").val()]
+        if (masklist){ newmaskids = masklist[$("#maskset").val()]}
+        if (!newmaskids) {newmaskids = []}
+        $("#maskselect").val(newmaskids).trigger("change"); 
+    });
+    $("#maskset").trigger("change"); 
+});
+
+// 触发productselect 执行
+$("#productselect").trigger("change"); 
+
+$("#save").click(function () { // 保存新套别
+   var maskids = $("#maskselect").select2('val')
+   var productid  = $("#productselect").val()
    if (maskids.length!=0)
    {
     alertify.prompt("请输入MASK套别名称","",
-     function (e, msg) 
+     function (e, maskset) 
     {
-     if (msg==''){
+     if (maskset==''){
         alertify.error("保存失败: 套别名称不能为空")
      }
      else{
-        // 储存文件 至 msg中  调用接口回传 后台
-        if (e) {alertify.success("保存成功 : " + msg)} 
+        if (e) {
+            var $formData=new FormData();
+            $formData.append("maskset",maskset);
+            $formData.append("maskids",maskids);
+            $formData.append("product",productid);
+            $.ajax({
+                url:"/newset",
+                type:"POST",
+                data:$formData,
+                contentType:false,
+                processData:false,
+                headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+                success:function (data) {
+                    console.log("success")
+                }
+            })
+            console.log(maskids,"after maskids")
+            if (!masksetdict[productid]){
+                masksetdict[productid] = {}}
+            if (!masksetdict[productid][maskset]){
+                $("#maskset").append(`<option value="${maskset}" selected>${maskset}</option>`);
+            }
+            masksetdict[productid][maskset] = maskids
+            $("#maskset").val(maskset).trigger("change"); 
+            console.log(masksetdict,"masksetdict")
+            alertify.success("保存成功 : " + maskset)
+        } 
         else {alertify.error("保存失败 ")}}}).set({title:"添加MASK"}).set({labels:{ok:'确定', cancel: '取消'}});
    }
    else
@@ -132,17 +209,39 @@ $("#save").click(function () {
    }
 })
 
-$("#maskselect").select2({
-        theme: "classic",
-        placeholder: "请选择MASKID",
-        language : "zh-CN",
-        minimumInputLength : 0,
-        allowClear: true,
-         closeOnSelect:false
-    })
+$("#delete").click(function () {  // 删除套别
+    var $formData=new FormData();
+    var maskset = $("#maskset").select2('val')
+    var productid  = $("#productselect").val()
+    if (maskset){
+      alertify.confirm(`是否确认删除 ${maskset} 套别 `,
+          function(){
+            var $formData=new FormData();
+            $formData.append("maskset",maskset);
+            $formData.append("product",productid);
+            $.ajax({
+                url:"/delset",
+                type:"POST",
+                data:$formData,
+                contentType:false,
+                processData:false,
+                headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+                success:function (data) {
+                    console.log("success")
+                }
+            })
+            index = $('#maskset').select2("data").element[0].index
+            delete  masksetdict[productid][maskset]
+            document.getElementById("maskset").options.remove(index);
+            $('#maskset').trigger("change"); 
+            alertify.success('删除套别成功');
+          },
+          function(){
+            alertify.error('取消删除');
+          });
+} 
+})
 
-$("#productselect").select2()
-$("#maskset").select2()
 
 function getDay(day){
 　　var today = new Date();
@@ -283,7 +382,7 @@ var $formData=new FormData();
 $formData.append("starttime",$("#datetimeStart").val());
 $formData.append("endtime",$("#datetimeEnd").val());
 $formData.append("productselect",$("#productselect").val());
-$formData.append("maskselect",$("#maskselect").val());
+$formData.append("maskselect", $("#maskselect").select2('val'));
 
 $.ajax({
     url:"/getppa",
@@ -304,7 +403,6 @@ $.ajax({
 })
 })
 
-// $("#ensure").click()  // 页面初始化后自动执行一次
 </script>
 
             </div>

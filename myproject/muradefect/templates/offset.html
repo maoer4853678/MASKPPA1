@@ -18,17 +18,17 @@
         <div class="container-fluid">
             {% csrf_token %}
             <div class="row">
-                <label class="breadcrumb">ExpLabel</label>
+                <label class="breadcrumb">周期</label>
                 <div class="breadcrumb">
-                  <input id = "explabel" type="text" placeholder="1" class="form-control form-control-line">
+                  <input id = "groupid" type="text" placeholder="1" class="form-control form-control-line">
                 </div>
 
-                <label class="breadcrumb">GrpLabel</label>
+                <label class="breadcrumb">Cycle</label>
                 <div class="breadcrumb">
-                  <input id = "grplabel" type="text" placeholder="1" class="form-control form-control-line">
+                  <input id = "cycleid" type="text" placeholder="1" class="form-control form-control-line">
                 </div>
  
-                <label class="breadcrumb">产品名称</label>
+                <label class="breadcrumb">产品</label>
                 <div class="breadcrumb">
                 <select style="width: 230px"  id="product">
                     {% for product in products %}
@@ -53,7 +53,7 @@
 
 
 <script type="text/javascript">
-    var clients =  {{ sumraydata|safe }} 
+    var clients =  {{ stadata|safe }} 
     console.log(clients,"clients")
     $("#jqGrid").jsGrid({
         width: "100%",
@@ -63,13 +63,7 @@
         sorting: true,
         paging: true,
         data: clients,
-        fields: [
-            { name: "Name", type: "text", width: 50,},
-            { name: "Age",  type: "text", width: 50,},
-            { name: "Address", type: "text", width: 50,},
-            { name: "Country",  type: "text", width: 50,},
-            { name: "Married",  type: "text", width: 50,}
-        ]
+        fields: {{ stafields|safe }} ,
     });
     
     $("#jqGrid1").jsGrid({
@@ -80,31 +74,27 @@
         sorting: true,
         paging: true,
         data: [],
-        fields: [
-            { name: "Name", type: "text", width: 50,},
-            { name: "Age",  type: "text", width: 50,},
-            { name: "Address", type: "text", width: 50,},
-            { name: "Country",  type: "text", width: 50,},
-            { name: "Married",  type: "text", width: 50,}
-        ]
+        fields:[]
     });
 
 $("#product").select2()
 
+
       $("#ensure").click(function () {
             var $formData=new FormData();
-            $formData.append("explabel",$("#explabel").val());
-            $formData.append("grplabel",$("#grplabel").val());
+            $formData.append("groupid",$("#groupid").val());
+            $formData.append("cycleid",$("#cycleid").val());
             $formData.append("product",$("#product").val());
             $.ajax({
-                url:"/getsumray",
+                url:"/getoffset",
                 type:"POST",
                 data:$formData,
                 contentType:false,
                 processData:false,
                 headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
-                success: function (data) {     
-                   $("#jqGrid1").jsGrid({data:data,height: "250px"});   
+                success: function (res) {     
+                   $("#jqGrid1").jsGrid({data:res.data,fields:res.fields,
+                         height: "250px"});   
                 }
             });
       });

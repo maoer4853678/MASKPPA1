@@ -1,15 +1,12 @@
 from django.urls import path
-
+from django.contrib import admin
 from . import views
 
 
 app_name = 'polls'
 urlpatterns = [
-#    path('', views.index, name='index'),
-#    path('/index', views.index, name='index'),
-#    path('option', views.option, name='option'), ## 用户配置页面
-#    path('plot', views.plot, name='plot'),
-#    path('glasses', views.glasses_optimize, name='glasses_optimize'),
+    path('admin', admin.site.urls),
+    
     path('', views.index, name='index'),
     path('index', views.index, name='index'),
     path('login', views.Login, name='login'),
@@ -24,7 +21,9 @@ urlpatterns = [
     
     
     path("getppa", views.GetPpa, name='getdata'),
-    path("getsumray", views.GetSumray, name='getdata1'),
+    path("getoffset", views.GetOffset, name='getdata1'),
     path("getopsppa", views.GetOpsPpa, name='getdata1'),
+    path("newset", views.NewSet, name='getdata1'),
+    path("delset", views.DelSet, name='getdata1'),
 
 ]
