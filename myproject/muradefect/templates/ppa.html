@@ -127,6 +127,10 @@ var option = {
 
 function FreshData(select){
    var charts = ['PPA_X','PPA_Y']
+   if (alldata[select].ppa_teg.length==0){
+        alertify.error("该Glass未被优化") 
+        return 
+       }
    console.log(select,"select")
    for (var chart = 0; chart <= charts.length; chart++) {
        item = charts[chart]
@@ -138,6 +142,7 @@ function FreshData(select){
        else{
         text = glassid+" "+chamber+": 优化后"+item+"分布"
        } 
+
        option.title.text = text
        scatter = {
             symbolSize: 10,
@@ -173,7 +178,7 @@ $("#ensure").click(function () {
         headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
         success:function (data) {
                 if (data.length==0){
-                    alert("未发现符合条件数据")
+                    alertify.error("未发现符合条件数据") 
                 }
                 else {
                     alldata = data

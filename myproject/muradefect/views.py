@@ -153,14 +153,13 @@ def AfterData(data):
     cols1 = ["groupid",'line','cycleid']
     conditon = list(map(lambda x:"%s = '%%s' "%x,cols))+list(map(lambda x:"%s = %%s "%x,cols1))
     conditon = ' and '.join(conditon)
-
     product_id,eva_chamber,mask_set,port,groupid,line,cycleid= data[cols+cols1].iloc[0].tolist()
     sql = "select delta_x,delta_y,delta_t from offset_table where %s"%conditon
     sql = sql%(product_id,eva_chamber,mask_set,port,groupid,line,cycleid)
-    delta_args = pd.read_sql_query(sql, con=conn.obj.conn).iloc[0].tolist()
-    print (delta_args)
+    delta_args = pd.read_sql_query(sql, con=conn.obj.conn)
+    print (delta_args,"delta_args")
     if len(delta_args)>0:
-        delta_x,delta_y,delta_tht = delta_args
+        delta_x,delta_y,delta_tht = delta_args.iloc[0].tolist()
         ## 将该glass所在的组别中 offset结果作用于他
         data['ppa_x'] = data['ppa_x']+delta_x-delta_tht*data['pos_y']*(np.pi / 180 / 100)
         data['ppa_y'] = data['ppa_y']+delta_y+delta_tht*data['pos_x']*(np.pi / 180 / 100)
@@ -223,6 +222,22 @@ def Register(request):
             return redirect('/')
             
     return render(request,'register.html')
+
+def GetInfo(df,settings):
+    if len(df)==0:
+        return {}
+    infos ={}
+    for key in ['ppa_x','ppa_y']:
+        info = {}
+        for th in ['th1','th2']:
+            key1 = "±%sum"%(str(settings[th]))
+            info[th+"_name"] = key1
+            info[th+"_len"]  = len(df[df[key].abs()<= float(settings[th])])
+            info[th+"_per"] = "%02.f%%"%(float(info[th+"_len"])/len(df)*100)      
+        info["min"] = round(df[key].min(),3)
+        info["max"] = round(df[key].max(),3)
+        infos[key.upper()] = info
+    return infos
 
 ################################################## Rest后台接口  ##############################################
 @need_logged_in
@@ -312,12 +327,19 @@ def GetOpsPpa(request):
     chamber = request.POST.get("chamber") 
     ## 优化前的 PPA数据  
     bdf = BeforeData(glassid,chamber)
+    print (bdf.shape,"bdf.shape")
     bplot = plot_data(bdf)
     
     adf = AfterData(bdf)
+    print (adf.shape,"adf.shape")
     aplot = plot_data(adf)
     
-    return HttpResponse(json.dumps({"before":bplot,"after":aplot})\
+    settings =  GetSP()   
+    glassinfo = {}
+    glassinfo["before"] =  GetInfo(bdf,settings)
+    glassinfo["after"] =  GetInfo(adf,settings)   
+
+    return HttpResponse(json.dumps({"before":bplot,"after":aplot,"glassinfo":glassinfo})\
                             ,content_type="application/json,charset=utf-8")
     
 def LogEtl(request):
