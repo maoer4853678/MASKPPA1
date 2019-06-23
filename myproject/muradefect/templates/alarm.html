@@ -21,6 +21,9 @@
                 <div class="breadcrumb">
                              <a  href = '/alarm' class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 刷新 </a>
                 </div>
+                <div class="breadcrumb">
+                    <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "download"> 下载报警日志 </a>
+                </div>
             </div>   
             <div class="row">
                   <table id="jqGrid"></table>
@@ -44,7 +47,37 @@
         shrinkToFit:false,
     });
     $("#jqGrid").trigger("reloadGrid");
-    
+
+$("#download").click(function () {
+    var $formData=new FormData();
+    obj = $("#jqGrid").data().JSGrid
+    var data = obj.data
+    data = data.map(item => Object.values(item))
+
+    if (data.length==0){
+        alertify.error("未发现符合条件数据") 
+    }
+    else{
+    var fields = obj.fields
+    fields = fields.map(item => item.name)
+    $formData.append("data",data);
+    $formData.append("fields",fields);
+    $.ajax({
+        url:"/downoffset",
+        type:"POST",
+        traditional:true, 
+        dataType:'json',
+        data:$formData,
+        contentType:false,
+        processData:false,
+        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+        success: function (res) {     
+            window.location.href = "/download/"+res.filename;      
+            alertify.success("下载成功") 
+        }})
+    }
+});
+
 </script>
 
 {% endblock %}

@@ -19,11 +19,14 @@ urlpatterns = [
     path("data", views.Data, name='data'),
     path("option", views.Option, name='option'),
     
-    
-    path("getppa", views.GetPpa, name='getdata'),
-    path("getoffset", views.GetOffset, name='getdata1'),
-    path("getopsppa", views.GetOpsPpa, name='getdata1'),
-    path("newset", views.NewSet, name='getdata1'),
-    path("delset", views.DelSet, name='getdata1'),
+    ## RestFul api
+    path('log', views.LogEtl, name='log'),
+    path('download/<str:filename>', views.DownLoad, name='DownLoad'),
+    path("getppa", views.GetPpa, name='getppa'),
+    path("getoffset", views.GetOffset, name='getoffset'),
+    path("downoffset", views.DownOffset, name='downoffset'),
+    path("getopsppa", views.GetOpsPpa, name='getopsppa'),
+    path("newset", views.NewSet, name='newset'),
+    path("delset", views.DelSet, name='delset'),
 
 ]

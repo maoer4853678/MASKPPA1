@@ -11,14 +11,37 @@ from .usercore import *
 from .forms import AddForm, GlassForm, GlassPlotForm,OptionForm,RegisterForm
 #from .utils_db import db
 #from django.db import connection as conn
-from .optimize_offset_threshold import cal_optimized_offset, plot_data
 import pandas as pd
+import numpy as np
 from imp import reload
 import datetime
+import random
+import string
+from django.http import FileResponse
 
 conn = GetConn()
 
 ################################################## 通用函数 ##############################################
+def siplitlist(listx,n,axis = 0):
+    '''
+    listx: 待分组序列，类型可以是list，np.array,pd.Series...
+    n: 若axis=0 n为组别个数,计算生成元素个数,若axis=1 n为每组元素个数,计算生成组别个数
+    axis: 若axis=0 按照固定组别个数分组, 若axis=1 按照固定元素个数分组
+    '''
+    if axis ==0:
+        a1,a2 = divmod(len(listx),n)
+        N = [a1]*(n-a2)+[a1+1]*a2 if a1!=0 else [1]*len(listx)
+        res = [listx[s:s+i] for s,i in enumerate(N) if len(listx[s:s+i])!=0]
+    else:
+        N = int(len(listx)/n)+1
+        res = [listx[i*n:(i+1)*n] for i in range(N) if len(listx[i*n:(i+1)*n])!=0]
+    return res
+
+def GetFilename():
+    a=''.join(random.sample(string.ascii_letters+string.digits,random.randint(3,12)))+".csv"
+    return a
+
+
 def GetProducts():
     products = pd.read_sql_query("select distinct product_id from eva_all ",con=conn.obj.conn)
     return products['product_id'].tolist()
@@ -31,16 +54,27 @@ def GetProductDict():
 
 def GetOffsetSta():
     ## 最近一周的 offset统计结果，可以改成sql 执行返回结果
-    endtime = datetime.datetime.now()
-    starttime = endtime - datetime.timedelta(days=7)
-    sql = '''
-    select GroupID,cycleID,product_id,min(eventtime) as starttime,max(eventtime) \
-    as endtime, GlassCount as count
-    from offset  where eventtime >='%s' and eventtime <= '%s' 
-    group by GroupID,cycleID,product_id,GlassCount    
-    '''%(starttime.strftime("%Y-%m-%d"),endtime.strftime("%Y-%m-%d"))
-    data = pd.read_sql_query(sql,con=conn.obj.conn)
-    return data
+    try:
+        endtime = datetime.datetime.now()
+    #    starttime = endtime - datetime.timedelta(days=7) ## 正常看一周
+        starttime = endtime - datetime.timedelta(days=90)
+        sql = '''
+        select distinct product_id as productid,groupid,line,eva_chamber as chamber,\
+         port,cycleid,starttime,endtime,glasscount as count from offset_table  \
+          where starttime >='%s' and starttime <= '%s' order by starttime desc\
+         '''%(starttime.strftime("%Y-%m-%d"),endtime.strftime("%Y-%m-%d"))
+        data = pd.read_sql_query(sql,con=conn.obj.conn)
+        data['count'] = data['count'].astype(int)
+        data['starttime'] = pd.to_datetime(data['starttime'])
+        data['endtime'] = pd.to_datetime(data['endtime'])
+        res =  data.groupby(['productid','groupid','line','cycleid']).\
+            agg({"starttime":"min","endtime":"max","count":"mean"}).reset_index()
+        res = res.sort_values(["starttime",'productid','groupid','line','cycleid'],\
+               ascending=False)
+        res.columns =res.columns.str.upper()
+        return data,res
+    except:
+        return pd.DataFrame(),pd.DataFrame()
 
 def GetPpaData(starttime,endtime,product,maskids):
     data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id from eva_all \
@@ -60,6 +94,8 @@ def GetPpaData(starttime,endtime,product,maskids):
 
 
 def GenerateTable(df):
+    if len(df)==0:
+        return [],[]
     d = {"int64":"int","int32":"int","float64":"float","float32":"float",\
      "datetime64[ns]":"text","object":"text" }
     df.columns = df.columns.str.upper()
@@ -84,18 +120,53 @@ def GenerateTable(df):
     data = list(df.T.to_dict().values())
     return data,fields
 
-def PlotBeforeData(data):
-    data['nx'] = data.pos_x+data.ppa_x
-    data['ny'] = data.pos_y+data.ppa_x
-    data['n1x'] = data.pos_x+data.ppa_y
-    data['n1y'] = data.pos_y+data.ppa_y
-    res = {"PPA_X":data[['nx','ny']].values.tolist(),\
-           "PPA_Y":data[['n1x','n1y']].values.tolist()}
-    return res
 
-def PlotAfterData(data):
-    res = PlotBeforeData(data)
-    return res
+def plot_data(df):
+    ppa_teg = []
+    ppa_ver = []
+    ppa_hor = []
+    if len(df)!=0:
+        df = df.sort_values(['pos_y', 'pos_x'])
+        ppa_teg = df[['pos_x', 'pos_y']].values.tolist()
+        df.ppa_x = df.pos_x + 10 * df.ppa_x
+        df.ppa_y = df.pos_y + 10 * df.ppa_y
+        ppa_ver = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
+                           ,df.groupby('x_label'))) ## 垂直方向
+        ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
+                           ,df.groupby('y_label'))) ## 水平方向
+    plots = {"ppa_teg":ppa_teg,"PPA_Y":ppa_ver,"PPA_X":ppa_hor}
+    return plots
+
+def BeforeData(glassid,chamber):
+    ## BeforeData 是从 EVA_ALL表获取的数据 ,需要获取到 glassid颗粒度的所有属性信息
+    data = pd.read_sql_query("select product_id,groupid, line, \
+                             eva_chamber,mask_set, port,cycleid,glass_id,\
+                          ppa_x,ppa_y, offset_x,offset_y, offset_tht, \
+                         x_label,y_label,pos_x,pos_y  from eva_all where \
+                         glass_id = '%s' and eva_chamber = '%s' \
+                         "%(glassid,chamber), con=conn.obj.conn)
+    return data
+
+def AfterData(data):
+    ## tAfterData 是按照before中的属性信息从 offset_table中取出优化结果
+    cols = ["product_id",'eva_chamber',"mask_set",'port']
+    cols1 = ["groupid",'line','cycleid']
+    conditon = list(map(lambda x:"%s = '%%s' "%x,cols))+list(map(lambda x:"%s = %%s "%x,cols1))
+    conditon = ' and '.join(conditon)
+
+    product_id,eva_chamber,mask_set,port,groupid,line,cycleid= data[cols+cols1].iloc[0].tolist()
+    sql = "select delta_x,delta_y,delta_t from offset_table where %s"%conditon
+    sql = sql%(product_id,eva_chamber,mask_set,port,groupid,line,cycleid)
+    delta_args = pd.read_sql_query(sql, con=conn.obj.conn).iloc[0].tolist()
+    print (delta_args)
+    if len(delta_args)>0:
+        delta_x,delta_y,delta_tht = delta_args
+        ## 将该glass所在的组别中 offset结果作用于他
+        data['ppa_x'] = data['ppa_x']+delta_x-delta_tht*data['pos_y']*(np.pi / 180 / 100)
+        data['ppa_y'] = data['ppa_y']+delta_y+delta_tht*data['pos_x']*(np.pi / 180 / 100)
+        return data
+    else:
+        return pd.DataFrame()
 
 
 ################################################## 注册系统  ##############################################
@@ -120,6 +191,7 @@ def Login(request):
                 return render(request,'login.html',{'error':"密码错误"})
             else:
                 request.session['logged'] =True
+                request.session['offset'] = {}
                 request.session['username'] = username
                 return redirect('/')     
     else:
@@ -198,13 +270,39 @@ def GetOffset(request):
     groupid = request.POST.get("groupid")
     cycleid = request.POST.get("cycleid") 
     product = request.POST.get("product") 
+    line = request.POST.get("line") 
     sql = '''
-    select * from offset  where groupid ='%s' and cycleid = '%s' and PRODUCT_ID = '%s'
-    '''%(groupid,cycleid,product)
+    select product_id as productid,groupid,line,eva_chamber as chamber,\
+         port,cycleid,starttime,endtime, delta_x,delta_y, delta_t as delta_tht,\
+         offset_x, offset_y, offset_tht from offset_table  \
+         where groupid =%s and cycleid = %s and PRODUCT_ID = '%s' and line = %s
+    '''%(groupid,cycleid,product,line)
     df = pd.read_sql_query(sql,con=conn.obj.conn)
+    df.columns = df.columns.str.upper()
     data,fields = GenerateTable(df)
     return HttpResponse(json.dumps({"data":data,"fields":fields})\
                             ,content_type="application/json,charset=utf-8")
+@need_logged_in
+def DownOffset(request):
+    print ("获取封装下载数据请求")
+    data = request.POST.get("data").split(",")
+    fields = request.POST.get("fields").split(",")
+    data = siplitlist(data,len(fields),axis=1)
+    if not os.path.exists("tempdir"):
+        os.makedirs("tempdir")
+    filename = GetFilename()
+    df = pd.DataFrame(data,columns = fields)
+    df.to_csv("./tempdir/%s"%filename,index=False)
+    return HttpResponse(json.dumps({"filename":filename}),content_type="application/json,charset=utf-8")
+
+@need_logged_in
+def DownLoad(request,filename):
+    print ("获取下载文件请求")
+    file=open("./tempdir/%s"%filename,'rb')  
+    response =FileResponse(file)  
+    response['Content-Type']='application/octet-stream'  
+    response['Content-Disposition']='attachment;filename="%s"'%filename
+    return response
 
 @need_logged_in
 def GetOpsPpa(request):
@@ -212,16 +310,28 @@ def GetOpsPpa(request):
     print ("获取GetOpsPpa数据请求")
     glassid = request.POST.get("glassid")
     chamber = request.POST.get("chamber") 
-    data = pd.read_sql_query("select ppa_x,ppa_y,offset_x,offset_y, offset_tht, \
-                             x_label,y_label,pos_x,pos_y  from eva_all where \
-                             glass_id = '%s' and eva_chamber = '%s' \
-                             "%(glassid,chamber), con=conn.obj.conn)
+    ## 优化前的 PPA数据  
+    bdf = BeforeData(glassid,chamber)
+    bplot = plot_data(bdf)
     
-    adf = PlotAfterData(data)
-    bdf = PlotBeforeData(data)
-    return HttpResponse(json.dumps({"before":adf,"after":bdf})\
+    adf = AfterData(bdf)
+    aplot = plot_data(adf)
+    
+    return HttpResponse(json.dumps({"before":bplot,"after":aplot})\
                             ,content_type="application/json,charset=utf-8")
     
+def LogEtl(request):
+    print ("获取 LogEtl 数据请求")
+    logpath = './muradefect/server/log'
+    files = os.listdir(logpath)
+    if len(files):
+        path = os.path.join(logpath,files[-1])
+        file=open(path,'rb')  
+        response =FileResponse(file)  
+        response['Content-Type']='application/octet-stream'  
+        response['Content-Disposition']='attachment;filename="%s"'%path
+        return response
+
 ################################################## 主要视图  ##############################################
     
 @need_logged_in
@@ -240,10 +350,15 @@ def index(request):
 def Offset(request):
     username=  request.session.get("username")
     products = GetProducts()
-    data = GetOffsetSta()  ## Offset 近一周的统计表
-    stadata,stafields = GenerateTable(data)
+    data,res = GetOffsetSta()  ## Offset 近一周的统计表
+    if len(res):
+        groupid,line,cycleid = res[['GROUPID','LINE','CYCLEID']].iloc[0].tolist()
+    else:
+        groupid,line,cycleid =0,1,0
+    stadata,stafields = GenerateTable(res)
     return render(request, 'offset.html',{'username': username,"products":products,"stadata":json.dumps(stadata),\
-                                          "stafields":json.dumps(stafields)})
+                                          "stafields":json.dumps(stafields),"groupid":groupid,"line":line,\
+                                          "cycleid":cycleid})
 
 @need_logged_in
 def Ppa(request):
@@ -258,6 +373,7 @@ def Ppa(request):
 def Alarm(request):
     username=  request.session.get("username")
     df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
+    df.columns = df.columns.str.upper()
     data,fields = GenerateTable(df)
     return render(request, 'alarm.html',{'username': username,"data":json.dumps(data),\
                  "fields":json.dumps(fields)})
@@ -267,9 +383,8 @@ def Data(request):
     username=  request.session.get("username")
     df = pd.read_sql_query("select * from eva_all ORDER BY EVENTTIME DESC limit 500 ",con = conn.obj.conn)
     df = df.drop(['x_label','y_label'],axis=1)
-    print ('debug',1)
+    df.columns = df.columns.str.upper()
     data,fields = GenerateTable(df)
-    print ('debug',2)
     return render(request, 'data.html',{'username': username,"data":json.dumps(data),\
                  "fields":json.dumps(fields)})
 
@@ -290,157 +405,3 @@ def Option(request):
                                                    "message":"设置失败, 你不是管理员账户","status":400})
         
     return render(request, 'option.html', {'username': username,"form":form,"status":200})
-
-    
-#def plot(request):
-#    p1 = pd.read_csv("./muradefect/data/EVA_ALL.csv")
-#    p1['EVENTTIME'] = pd.to_datetime(p1['EVENTTIME'])
-#
-#    all_glasses = p1[p1.EVA_CHAMBER == 'B'][['RECIPE', 'GLASS_ID', 'MASK_ID']].drop_duplicates()
-#    glass = p1.GLASS_ID.iloc[0]
-#    chamber = p1.EVA_CHAMBER.iloc[0]
-#
-#    ppa_teg, ppa_val = plot_data(p1, glass, chamber)
-#
-#    form = GlassPlotForm()
-#    data = {'form': form,
-#            'all_glasses': all_glasses.to_html(index=False),
-#            'title': json.dumps(glass + '-' + chamber),
-#            'ppa_teg': json.dumps(ppa_teg),
-#            'ppa_val': json.dumps(ppa_val)
-#            }
-#
-#    if request.method == 'POST':
-#        form = GlassPlotForm(request.POST)
-#
-#        if form.is_valid():
-#            glass = form.cleaned_data['glasses']
-#            chamber = form.cleaned_data['chamber']
-#
-#            ppa_teg, ppa_val = plot_data(p1, glass, chamber)
-#
-#        data = {'form': form,
-#                'all_glasses': all_glasses.to_html(index=False),
-#                'title': json.dumps(glass + '-' + chamber),
-#                'ppa_teg': json.dumps(ppa_teg),
-#                'ppa_val': json.dumps(ppa_val)
-#                }
-#
-#    return render(request, 'plot.html', data)
-#
-#
-#def glasses_optimize(request):
-#    p1 = pd.read_csv("./muradefect/data/EVA_ALL.csv")
-#    p1['EVENTTIME'] = pd.to_datetime(p1['EVENTTIME'])
-#
-#    all_glasses = p1[p1.EVA_CHAMBER == 'B'][['RECIPE', 'GLASS_ID', 'MASK_ID']].drop_duplicates()
-#
-#    form = GlassForm()
-#    data = {'form': form, 'all_glasses': all_glasses.to_html(index=False)}
-#
-#    if request.method == 'POST':
-#        mask_id = pd.read_sql_table('MASK_ID', con=conn).set_index('index')
-#        form = GlassForm(request.POST)
-#        glass_ids = request.session['glass_ids']
-#        info = 'This is the optimize page'
-#        optimize_result = 'No glasses available to optimize!'
-#
-#        if form.is_valid():
-#            glass = form.cleaned_data['glasses']
-#
-#            if request.POST.get('add'):
-#                glass_ids = glass_ids + [glass]
-#
-#                info = 'This is an add'
-#            elif request.POST.get('delete'):
-#                if len(glass_ids):
-#                    glass_ids.pop()
-#
-#                info = 'This is a delete'
-#            elif request.POST.get('clear'):
-#                glass_ids = []
-#
-#                info = 'This is a clear'
-#            elif request.POST.get('optimize'):
-#                p2 = p1[p1.GLASS_ID.isin(glass_ids)]
-#
-#                if p2.shape[0]:
-#                    r4 = p2.groupby(['RECIPE', 'exp_label', 'prd_label', 'grp_label',
-#                                     'EVA_CHAMBER', 'MASK_ID', 'line']).\
-#                        apply(cal_optimized_offset).reset_index()
-#
-#                    r4.EVENTTIME = pd.to_datetime(r4.EVENTTIME)
-#
-#                    r5 = r4.rename(columns={'EVA_CHAMBER': 'OC'})\
-#                        [['RECIPE', 'EVENTTIME', 'OC', 'MASK_ID', 'line',
-#                          'OFFSET_X', 'OFFSET_Y', 'OFFSET_T',
-#                          'AFTER_X', 'AFTER_Y', 'AFTER_T',
-#                          'PPA', 'PPA_BEFORE']].sort_values('EVENTTIME')
-#
-#                    optimize_result = r5.to_html(index=False)
-#
-#                info = 'This is an optimize'
-#            else:
-#                info = 'Something is wrong!'
-#
-#        request.session['glass_ids'] = glass_ids
-#
-#        glass_pars = mask_id[mask_id.GLASS_ID.isin(glass_ids)].sort_values('EVENTTIME')
-#        glass_selected = all_glasses[all_glasses.GLASS_ID.isin(glass_ids)]
-#
-#        data = {'info': info, 'form': form,
-#                'glass_selected': glass_selected.to_html(index=False),
-#                'all_glasses': all_glasses.to_html(index=False),
-#                'glass_pars': glass_pars.to_html(index=False),
-#                'optimize_result': optimize_result}
-#
-#    return render(request, 'glasses.html', data)
-
-    
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

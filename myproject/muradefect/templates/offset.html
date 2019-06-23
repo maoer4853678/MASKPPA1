@@ -18,16 +18,6 @@
         <div class="container-fluid">
             {% csrf_token %}
             <div class="row">
-                <label class="breadcrumb">周期</label>
-                <div class="breadcrumb">
-                  <input id = "groupid" type="text" placeholder="1" class="form-control form-control-line">
-                </div>
-
-                <label class="breadcrumb">Cycle</label>
-                <div class="breadcrumb">
-                  <input id = "cycleid" type="text" placeholder="1" class="form-control form-control-line">
-                </div>
- 
                 <label class="breadcrumb">产品</label>
                 <div class="breadcrumb">
                 <select style="width: 230px"  id="product">
@@ -36,18 +26,36 @@
                     {% endfor %} 
                 </select>
                 </div>
+
+                <label class="breadcrumb">周期</label>
                 <div class="breadcrumb">
-                             <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
+                  <input id = "groupid" type="text" value="{{ groupid }}" placeholder="请输入周期" class="form-control form-control-line">
                 </div>
+
+                <label class="breadcrumb">生产线</label>
+                <div class="breadcrumb">
+                  <input id = "line" type="text" value="{{ line }}" placeholder="请输入产线" class="form-control form-control-line">
+                </div>
+
+                <label class="breadcrumb">Cycle</label>
+                <div class="breadcrumb">
+                  <input id = "cycleid" type="text" value="{{ cycleid }}" placeholder="请输入Cycle" class="form-control form-control-line">
+                </div>
+ 
+                <div class="breadcrumb">
+                    <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
+                </div>
+
             </div>   
             <div class="row">
                   <table id="jqGrid"></table>
             </div>   
             <div class="row">
+                <div class="breadcrumb">
+                    <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "download"> 下载offset结果 </a>
+                </div>
                   <table id="jqGrid1"></table>
             </div>  
-
-
 
         </div>
 
@@ -79,25 +87,56 @@
 
 $("#product").select2()
 
+$("#ensure").click(function () {
+    var $formData=new FormData();
+    $formData.append("line",$("#line").val());
+    $formData.append("groupid",$("#groupid").val());
+    $formData.append("cycleid",$("#cycleid").val());
+    $formData.append("product",$("#product").val());
+    $.ajax({
+        url:"/getoffset",
+        type:"POST",
+        data:$formData,
+        contentType:false,
+        processData:false,
+        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+        success: function (res) {     
+           $("#jqGrid1").jsGrid({data:res.data,fields:res.fields,
+                 height: "250px"});   
+        }
+    });
+});
 
-      $("#ensure").click(function () {
-            var $formData=new FormData();
-            $formData.append("groupid",$("#groupid").val());
-            $formData.append("cycleid",$("#cycleid").val());
-            $formData.append("product",$("#product").val());
-            $.ajax({
-                url:"/getoffset",
-                type:"POST",
-                data:$formData,
-                contentType:false,
-                processData:false,
-                headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
-                success: function (res) {     
-                   $("#jqGrid1").jsGrid({data:res.data,fields:res.fields,
-                         height: "250px"});   
-                }
-            });
-      });
+$("#download").click(function () {
+    var $formData=new FormData();
+    obj = $("#jqGrid1").data().JSGrid
+    var data = obj.data
+    data = data.map(item => Object.values(item))
+
+    if (data.length==0){
+        alertify.error("未发现符合条件数据") 
+    }
+    else{
+    var fields = obj.fields
+    fields = fields.map(item => item.name)
+    $formData.append("data",data);
+    $formData.append("fields",fields);
+    $.ajax({
+        url:"/downoffset",
+        type:"POST",
+        traditional:true, 
+        dataType:'json',
+        data:$formData,
+        contentType:false,
+        processData:false,
+        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+        success: function (res) {     
+            window.location.href = "/download/"+res.filename;      
+            alertify.success("下载成功") 
+        }})
+    }
+});
+
 </script>
 
 {% endblock %}

@@ -99,6 +99,18 @@ DATABASES = {
 }
 
 
+#DATABASES = {
+#    'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'k2data',
+#         'USER': 'k2data',
+#         'PASSWORD': 'K2data1234',
+#         'HOST': '49.4.71.110',
+#         'PORT': '30012',
+#         #'CONN_MAX_AGE': 5,
+#     }
+#}
+
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators

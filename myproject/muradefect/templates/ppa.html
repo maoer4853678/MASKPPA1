@@ -37,6 +37,7 @@
                 <div class="breadcrumb">
                      <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
                 </div>
+                </div>
 
                 <div class="row">
                     <div class="breadcrumb">
@@ -60,156 +61,132 @@
                     </div>
                 </div>
 
-                <script type="text/javascript">
-                // 基于准备好的dom，初始化echarts实例
-                var alldata = {{alldata |safe}}
-                var option = {
-                    title: {
-                        text: ''
-                    },
-                    tooltip: {
-                        trigger: 'axis'
-                    },
-                    legend: {
-                        show : true,
-                    },
-                    grid: {
-                        left: '3%',
-                        right: '4%',
-                        bottom: '3%',
-                        containLabel: true
-                    },
-                    dataZoom: [
-                        {
-                            type: 'slider',
-                            xAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'slider',
-                            yAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'inside',
-                            xAxisIndex: 0,
-                            filterMode: 'empty'
-                        },
-                        {
-                            type: 'inside',
-                            yAxisIndex: 0,
-                            filterMode: 'empty'
-                        }
-                    ],
-                    toolbox: {
-                        show: true,
-                        feature: {
-                            dataZoom: {},
-                            dataView: {readOnly: false},
-                            restore: {},
-                            saveAsImage: {}
-                        }
-                    },
-                    xAxis: {
-                        type: 'value',
-                    },
-                    yAxis: {
-                        type: 'value',
-                    },
-                    series: [
-                        {
-                            symbolSize: 10,
-                            type:'scatter',
-                            data:[]
-                        }
-                    ]
-                };
+<script type="text/javascript">
 
-               var charts = ['PPA_X','PPA_Y']
-               function FreshData(select){
-                   console.log(select,"select")
-                   for (var i = 0; i < charts.length; i++) {
-                       item = charts[i]
-                       var myChart = echarts.init(document.getElementById(item));
-                       option.series[0].data = alldata[select][item]
-                       if (select=='before')
-                       {
-                        text = "优化前"+item+"分布"
-                       }
-                       else{
-                        text = "优化后"+item+"分布"
-                       }
-                       option.title.text = text
-                       myChart.setOption(option);
-                       
-                }
-               }
+// 基于准备好的dom，初始化echarts实例
+var alldata = {{alldata |safe}} // {"before":{"PPA_X":[]}}
+var glassid = ''
+var chamber = ''
 
-             $("#glassid").select2()
-             $("#chamber").select2()
-
-              $("#ensure").click(function () {
-                    var $formData=new FormData();
-                    $formData.append("glassid",$("#glassid").val());
-                    $formData.append("chamber",$("#chamber").val());
-                    $.ajax({
-                        url:"/getopsppa",
-                        type:"POST",
-                        data:$formData,
-                        contentType:false,
-                        processData:false,
-                        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
-                        success:function (data) {
-                                if (data.length==0){
-                                    alert("未发现符合条件数据")
-                                }
-                                else {
-                                    alldata = data
-                                    FreshData("before")
-                                }
-                        }
-                    })
-                    })
-
-                $("#ensure").click()  // 页面初始化后自动执行一次
-
-
-                </script>
-
-            </div>
-{% endblock %}
-
-<!-- 
-option = {
-    xAxis: {},
-    yAxis: {},
-    series: [{
-        symbolSize: 20,
-        data: [
-            [10.0, 8.04],
-            [8.0, 6.95],
-            [13.0, 7.58],
-            [9.0, 8.81],
-            [11.0, 8.33],
-            [14.0, 9.96],
-            [6.0, 7.24],
-            [4.0, 4.26],
-            [12.0, 10.84],
-            [7.0, 4.82],
-            [5.0, 5.68]
-        ],
-        type: 'scatter'
+var option = {
+    title: {
+        text: ''
     },
-    {
-        type:"line",
-        data:[[3,5],[6,9],[6,11]],
-        color:"bllue"
+    tooltip: {
+        trigger: 'axis'
     },
-    {
-        type:"line",
-        data:[[9,5],[12,9],[9,11]],
-        color:"bllue"
-    }
+    legend: {
+        show : true,
+    },
+    grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '3%',
+        containLabel: true
+    },
+    dataZoom: [
+        {
+            type: 'slider',
+            xAxisIndex: 0,
+            filterMode: 'empty'
+        },
+        {
+            type: 'slider',
+            yAxisIndex: 0,
+            filterMode: 'empty'
+        },
+        {
+            type: 'inside',
+            xAxisIndex: 0,
+            filterMode: 'empty'
+        },
+        {
+            type: 'inside',
+            yAxisIndex: 0,
+            filterMode: 'empty'
+        }
+    ],
+    toolbox: {
+        show: true,
+        feature: {
+            dataZoom: {},
+            dataView: {readOnly: false},
+            restore: {},
+            saveAsImage: {}
+        }
+    },
+    xAxis: {
+        type: 'value',
+    },
+    yAxis: {
+        type: 'value',
+    },
+    series: [
     ]
 };
- -->
+
+function FreshData(select){
+   var charts = ['PPA_X','PPA_Y']
+   console.log(select,"select")
+   for (var chart = 0; chart <= charts.length; chart++) {
+       item = charts[chart]
+       var myChart = echarts.init(document.getElementById(item));
+       if (select=='before')
+       {
+        text = glassid+" "+chamber+": 优化前"+item+"分布"
+       }
+       else{
+        text = glassid+" "+chamber+": 优化后"+item+"分布"
+       } 
+       option.title.text = text
+       scatter = {
+            symbolSize: 10,
+            type:'scatter',
+            data:alldata[select]["ppa_teg"]}
+       series = [scatter]
+       for (var i = 0; i < alldata[select][item].length; i++) {
+           line = {
+            type:'line',
+            data: alldata[select][item][i] }
+            series.push(line)
+       }
+       option.series = series
+       myChart.setOption(option);      
+    }
+}
+
+$("#glassid").select2()
+$("#chamber").select2()
+
+$("#ensure").click(function () {
+    var $formData=new FormData();
+    glassid = $("#glassid").val()
+    chamber = $("#chamber").val()
+    $formData.append("glassid",glassid);
+    $formData.append("chamber",chamber);
+    $.ajax({
+        url:"/getopsppa",
+        type:"POST",
+        data:$formData,
+        contentType:false,
+        processData:false,
+        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+        success:function (data) {
+                if (data.length==0){
+                    alert("未发现符合条件数据")
+                }
+                else {
+                    alldata = data
+                    console.log(alldata)
+                    FreshData("before")
+                }
+        }
+    })
+    })
+
+$("#ensure").click()  // 页面初始化后自动执行一次
+</script>
+
+
+</div>
+{% endblock %}
