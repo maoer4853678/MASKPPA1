@@ -134,7 +134,7 @@ def plot_data(df):
                            ,df.groupby('x_label'))) ## 垂直方向
         ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('y_label'))) ## 水平方向
-    plots = {"ppa_teg":ppa_teg,"PPA_Y":ppa_ver,"PPA_X":ppa_hor}
+    plots = {"ppa_teg":ppa_teg,"PPA_X":ppa_ver,"PPA_Y":ppa_hor}
     return plots
 
 def BeforeData(glassid,chamber):
