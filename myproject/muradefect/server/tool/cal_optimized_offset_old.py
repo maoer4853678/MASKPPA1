@@ -1,7 +1,34 @@
-import pandas as pd
+# -*- coding: utf-8 -*-
+"""
+Created on %(date)s
+
+@author: %(username)s 
+
+Authenticated by Sherk
+Any question please refer to:
+    sherkfung@gmail.com
+"""
+
+
+'''
+20190621客户需求：需要设定阈值。当结果（分数）中的before和after差别小于该阈值的时候，选择不优化。
+
+'''
+
+
+
+#p2=DF.head(114)
+'''
+POINT_NO是指TAG的编号。共len(x)/114是因为共有114个点；
+不理解物理意义，推测是计算此过程经过了几道工序（每道工序需要经过114个点）。
+后面的似乎没有用上p3这个量。（后面cal_ratio_bna函数中用到的p3和这个p3不一样。）
+'''
+
+# Define optimizing functions
+
 import numpy as np
 import itertools
-import time
+import pandas as pd
 
 OFFSETS = np.vstack(
     map(
@@ -14,6 +41,7 @@ OFFSETS = np.vstack(
         )
     ).T
 
+#THRESHOLD = 6.5
 WEIGHT = 1
 
 def cal_offseted(data, off=np.zeros(3)):
@@ -85,39 +113,27 @@ def cal_offseted_count(data, off=np.zeros(3)):
 
 def optimize_offset(p2):
     #用来分别计算每一个offset组下，调整后的ppa中良品的数量（如前文所说，全部合格则为4倍的行数）    
-    st = time.time()
-    offset = pd.DataFrame(OFFSETS)
-    offset.columns = ['offset_x','offset_y','offset_t']
-    offset['offset_t1'] = offset['offset_t'] 
-    offset['id'] = offset.index
-    #N = 1000
-    #offset1 = offset.loc[:N-1]
-    offset1 = offset
-    WEIGHT = 1
-    data1 = p2[['pos_x', 'pos_y','ppa_x', 'ppa_y']]
-    datasets = pd.concat(itertools.repeat(data1,len(offset1)))
-    print (datasets.shape)
-    datasets['id'] = np.repeat(offset1.index,len(data1))
-    datasets = pd.merge(datasets,offset,on = 'id')
-    print (datasets.shape)
+    datasets = itertools.repeat(p2, OFFSETS.shape[0]) 
+    '''
+    这里的函数定义括号里的dataset，指的是：
+    p2[['pos_x', 'pos_y', 'ppa_x', 'ppa_y']].values
+    '''
     
-    datasets["pos_y"] = datasets["pos_y"]*-1
-    datasets[["pos_y","pos_x"]] = datasets[["pos_y","pos_x"]].values*\
-            datasets[['offset_t','offset_t1']].values*np.pi/180/100
-    datasets["pos_y"] = datasets["pos_y"]+datasets['offset_x'] 
-    datasets["pos_x"] = datasets["pos_x"]+datasets['offset_y'] 
-    datasets[["pos_y","pos_x"]]  = datasets[["pos_y","pos_x"]].values \
-        +datasets[["ppa_x","ppa_y"]].values
-    print (datasets.shape)  
+    '''
+    datasets表示生成一个循环器，将dataset重复len(OFFSET)遍，
+    意义在于每个dataset的对应上所有的OFFSET可能；
     
-    datasets[["pos_y","pos_x"]] = datasets[["pos_y","pos_x"]].abs()
-    datasets['bz1'] = (datasets[["pos_y","pos_x"]]<6.5).sum(axis=1)
-    datasets['bz2'] = (datasets[["pos_y","pos_x"]]<4).sum(axis=1)
-    datasets['rst'] = datasets['bz1']+datasets['bz2']*WEIGHT
-    print (datasets.shape)  
+    map(cal_offseted_count, datasets, OFFSETS)，表示datasets在对应的OFFSETS下做cal_offseted_count函数；
+    亦即让dataset组合每一个OFFSETS中的元素，计算出cal_offseted_count函数。    
+    '''
     
-    rst = datasets.groupby("id")['rst'].sum()
-    print ("cost : ",time.time()-st)      
+    rst = np.fromiter(
+            map(cal_offseted_count, datasets, OFFSETS), dtype=np.float)
+    '''
+    
+    '''
+    #每个datasets
+#            map(cal_offseted_ratio, datasets, OFFSETS, 'X'), dtype=np.float)    
     return rst
 
 #计算比例用的，功能和Excel中统计部分很相似???
@@ -175,8 +191,8 @@ def cal_optimized_offset(p2):
 #    r2['eventtime'] = p2['eventtime'].max()
     #找到计算平均得到的offset值最接近的meshgrid点
     
-    r2[['delta_x', 'delta_y']] = (r2[['delta_x', 'delta_y']] * 2).round()/ 2.0
-    r2['delta_T'] = r2['delta_T'].round()
+    r2[['delta_x', 'delta_y']] = (r2[['delta_x', 'delta_y']] * 2).apply(round) / 2
+#    r2['delta_T'] = r2['delta_T'].apply(round)
     r2['offset_x'] = p2['offset_x'].mean()
     '''p2的X,Y,T来自maskID，具体意义尚不知'''
     r2['offset_y'] = p2['offset_y'].mean()
@@ -193,3 +209,12 @@ def cal_optimized_offset(p2):
     
 #r3 = cal_ratio_bna(p2, off)
     return pd.concat([r2, cal_ratio_bna(p2, off)])
+
+#if __name__=='__main__':
+#    tic=datetime.datetime.now()
+#    DF=pd.read_csv(r'D:\VisionoxLayout\muradefect\DataNeedToCalppa.csv')
+#    df=DF.head(114)
+#    Temp=cal_optimized_offset(df)
+#    
+#    toc=datetime.datetime.now()
+#    print('Done using %d s'%(toc-tic).total_seconds())

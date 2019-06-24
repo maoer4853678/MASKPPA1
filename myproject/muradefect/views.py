@@ -223,22 +223,6 @@ def Register(request):
             
     return render(request,'register.html')
 
-def GetInfo(df,settings):
-    if len(df)==0:
-        return {}
-    infos ={}
-    for key in ['ppa_x','ppa_y']:
-        info = {}
-        for th in ['th1','th2']:
-            key1 = "±%sum"%(str(settings[th]))
-            info[th+"_name"] = key1
-            info[th+"_len"]  = len(df[df[key].abs()<= float(settings[th])])
-            info[th+"_per"] = "%02.f%%"%(float(info[th+"_len"])/len(df)*100)      
-        info["min"] = round(df[key].min(),3)
-        info["max"] = round(df[key].max(),3)
-        infos[key.upper()] = info
-    return infos
-
 ################################################## Rest后台接口  ##############################################
 @need_logged_in
 def NewSet(request):
@@ -319,6 +303,21 @@ def DownLoad(request,filename):
     response['Content-Disposition']='attachment;filename="%s"'%filename
     return response
 
+def GetInfo(df,settings):
+    if len(df)==0:
+        return {}
+    infos ={}
+    for key in ['ppa_x','ppa_y']:
+        info = {}
+        
+            info[th+"_name"] = key1
+            info[th+"_len"]  = len(df[df[key].abs()<= float(settings[th])])
+            info[th+"_per"] = "%02.f%%"%(float(info[th+"_len"])/len(df)*100)      
+        info["min"] = round(df[key].min(),3)
+        info["max"] = round(df[key].max(),3)
+        infos[key.upper()] = info
+    return infos
+
 @need_logged_in
 def GetOpsPpa(request):
     ## 绘制散点图所需数据, 优化反算
@@ -337,7 +336,20 @@ def GetOpsPpa(request):
     settings =  GetSP()   
     glassinfo = {}
     glassinfo["before"] =  GetInfo(bdf,settings)
-    glassinfo["after"] =  GetInfo(adf,settings)   
+    glassinfo["after"] =  GetInfo(adf,settings)
+    
+    fields = ["±%sum"%(str(settings[th])) for th in ['th2','th1']]
+    fields+=['最大值','最小值']      
+    fields= pd.DataFrame(fields,columns = ['name'])
+    fields['type'] = 'text'
+    fields["sortable"] = True    
+    fields['align'] =  "center"
+    fields['hide'] = True
+    fields = list(df1.T.to_dict().values())
+    
+    
+#    data = list(df.T.to_dict().values())
+    
 
     return HttpResponse(json.dumps({"before":bplot,"after":aplot,"glassinfo":glassinfo})\
                             ,content_type="application/json,charset=utf-8")
