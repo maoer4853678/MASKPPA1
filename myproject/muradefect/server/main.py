@@ -12,6 +12,7 @@ import cx_Oracle
 import time
 import datetime
 import numpy as np
+import pandas as pd
 
 CONFIGROOT= '../static/conf'
 LOGGING = './log'
@@ -160,7 +161,11 @@ if __name__=="__main__":
                     st =time.time()
                     df['x_label'] = df['x_label'].astype(int)
                     df['y_label'] = df['y_label'].astype(int)
+                    
+                    ## 对df 进行判断，是否EVA_ALL表已经存在 其Glass数据，避免数据重复插入
                     conn2 =Mysql(**init['datebase2'])
+                    glassid = pd.read_sql_query("select DISTINCT glass_id from eva_all",con = conn2.obj.conn)
+                    df = df[~df.glass_id.isin(glassid['glass_id'])]
                     DataChoose,data2=CycleJudge(df,conn=conn2.obj.conn)
                     logger.info("初次筛选后的 DataChoose.shape : %s"%(str(DataChoose.shape)))
                     conn2.close()
@@ -220,15 +225,14 @@ if __name__=="__main__":
                         ## df3 仅是用于计算的 数据源
                         st = time.time()
                         
-    #                    df3.to_pickle('df3.pk')
-                        
+                        df3.to_pickle('optimize.pk')
                         res=df3.groupby(['product_id', 'groupid','line','eva_chamber','port','cycleid']).apply(cal_optimized_offset)
                         res = pd.merge(res.reset_index(),df2[['product_id', "groupid",'line','eva_chamber','port','cycleid',\
                                        "mask_set",'glasscount', 'starttime', 'endtime']].drop_duplicates(),\
                                        on = ['product_id', "groupid",'line','eva_chamber','port','cycleid']) 
                         ## 获取每个cycle 颗粒度下的 'groupid','glasscount', 'starttime', 'endtime' 静态属性
                         res.columns = res.columns.str.replace(".",'')
-    #                    res.to_pickle("offset_table.pk")
+                        res.to_pickle("offset_table.pk")
                         conn2 =Mysql(**init['datebase2'])
                         if "offset_table" not in conn2.list_table():
                             conn2.creat_table_from_df("offset_table",res)
