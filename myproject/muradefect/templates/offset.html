@@ -102,6 +102,7 @@ $("#ensure").click(function () {
         headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
         success: function (res) { 
             glassinfo = res.glassinfo
+            console.log(res.data,"debug res.data")
            $("#jqGrid1").jsGrid({data:res.data,fields:res.fields,
                  height: "250px"});   
         }

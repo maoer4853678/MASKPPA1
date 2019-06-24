@@ -4,7 +4,7 @@
 """
 import os,configparser
 import datetime
-from tool.my2sql import Mysql
+from tool.my2sql import Mysql,oracle_obj
 from tool.GetNewdata import *
 from tool.cal_optimized_offset import *
 import logging
@@ -36,13 +36,17 @@ def GetOption():
     cols = ['opsnumber','offsetth']
     opt_args = dict(zip(map(lambda x:x.lower(),cols),map(lambda x:float(config.get("settings",x)),cols)))
     
+    datebase1 = dict(config['datebase1'].items())  ## 项目依赖的本地数据库
     datebase2 = dict(config['datebase2'].items())  ## 项目依赖的本地数据库
+    datebase3 = dict(config['datebase3'].items())  ## 项目依赖的本地数据库
     
     init['base']  =base_args
     init['ops']  =ops_args
     init['th']  =th_args
     init['opt']  =opt_args
-    init['datebase2']  =datebase2    
+    init['datebase1']  =datebase1
+    init['datebase2']  =datebase2
+    init['datebase3']  =datebase3
     return init
 
 def lambdaGet(starttime,endtime):
@@ -76,9 +80,26 @@ def SetOption(key = "",value = ""):
     config.set("base",key,value)
     config.write(open(os.path.join(CONFIGROOT,'conf.ini'),'w'))
 
-if __name__=="__main__": 
-    
-    import glob
+
+def InsertCIM(df,init1):
+    df['timekey'] = df['endtime'].dt.strftime("%Y%m%d%H%M%S")+"000000"
+    df['maskname'] = df["mask_id"]
+    df['chambername'] = df["eva_chamber"]
+    df['linetype'] = df["line"]
+    df['evaoffsetx'] = df["offset_x"]
+    df['evaoffsety'] = df["offset_y"]
+    df['evaoffsettheta'] = df["offset_tht"]
+    df['ifflag'] = 'N'
+    df = df.astype(str)
+    cols = ["timekey","maskname","chambername","linetype",\
+            "evaoffsetx","evaoffsety","evaoffsettheta","ifflag"]
+    df = df[cols]
+    init1['engine'] = "o"
+    conn3 = Mysql(**init1)
+    conn3.insert_df("mes_bigdataif_maskoffset",df)
+    conn3.close()
+
+if __name__=="__main__":    
     #########################   日志文件格式配置文件    #########################
     logger = logging.getLogger(__name__)
     logger.setLevel(level = logging.DEBUG)
@@ -93,29 +114,40 @@ if __name__=="__main__":
     console.setLevel(logging.INFO)
     
     logger.addHandler(handler)
-    logger.addHandler(console)
-    
-    Files=glob.glob(r'..\data\Data*.csv') 
-    i=0
-    for F in Files:
-        appst = time.time()
-        
+    logger.addHandler(console)   
+    print ("#############   528    #############")
+    for sadasdasd in range(528):
+        appst = time.time()        
         logger.info('#########################   读取配置文件    #########################')
         init = GetOption()
         starttime = init['base']['starttime']
         endtime = init['base']['endtime']
+        endtime=pd.to_datetime(starttime)+pd.to_timedelta(1,unit='h')
+        endtime=str(endtime)
         running = init['base']['running']
         logger.info('本次获取时间范围 ： %s -- %s'%(starttime,endtime))
         
-        if running == "0" : ## 表示该阶段未有程序运行，可以往下执行
-
-            logger.info('#########################   获取数据阶段    #########################')         
+        if running == "0" : ## 表示该阶段未有程序运行，可以往下执行            
+            logger.info('#########################   获取数据阶段    #########################')
+            user = init['datebase1']['user']
+            dbname = init['datebase1']['dbname']
+            password = init['datebase1']['password']
+            host = init['datebase1']['host']
+            port = init['datebase1']['port']
+            conn1 = cx_Oracle.connect("%s/%s@%s:%s/%s"%(user,password,host,port,dbname))
+            df=DataCollect(starttime,endtime,conn=conn1)
             SetOption("running","1")  ## 将 running状态置为 1 ，表示程序正在执行，防止重复运行
-            i+=1
-            filename=F.split('\\')[-1]  
-            df=pd.read_csv(F,index_col=0)
-            logger.info('@@@@@@@@@@@@@@@@@@@@   开始读第%d个文件：%s   @@@@@@@@@@@@@@@@@@@@@@@' %(i,filename))      
+    #        filename=F.split('\\')[-1]  
+    #        df=pd.read_csv(F,index_col=0)
+            #logger.info('@@@@@@@@@@@@@@@@@@@@   开始读第%d个文件：%s   @@@@@@@@@@@@@@@@@@@@@@@' %(i,filename))      
             df.columns=df.columns.str.lower()
+            ##@@##        
+            S=starttime.replace(':','').replace('-','').replace(' ','')
+            E=endtime.replace(':','').replace('-','').replace(' ','')
+            FilePath=r'.\data\OracleFrom%sTo%s'%(S,E)
+            if not os.path.exists(FilePath):
+                os.makedirs(FilePath)
+#            df.to_csv(os.path.join(FilePath,'eva_all.csv'),index=False)
             if (len(df)):
                 df.eventtime=pd.to_datetime(df.eventtime)
                 logger.info('获取数据完成 ,数据shape : %s ,耗时 :  %0.2fs'%(str(df.shape),time.time()-appst))            
@@ -166,14 +198,25 @@ if __name__=="__main__":
                     conn2 =Mysql(**init['datebase2'])
                     glassid = pd.read_sql_query("select DISTINCT glass_id from eva_all",con = conn2.obj.conn)
                     df = df[~df.glass_id.isin(glassid['glass_id'])]
-                    DataChoose,data2=CycleJudge(df,conn=conn2.obj.conn)
-                    logger.info("初次筛选后的 DataChoose.shape : %s"%(str(DataChoose.shape)))
-                    conn2.close()
+                    if len(df):
+                        DataChoose,data2=CycleJudge(df,conn=conn2.obj.conn)
+                        ##@@##
+#                        DataChoose.to_csv(os.path.join(FilePath,'datachoose.csv'),index=False)
+#                        data2.to_csv(os.path.join(FilePath,'data2.csv'),index=False)
+                    
+                        logger.info("初次筛选后的 DataChoose.shape : %s"%(str(DataChoose.shape)))
+                    else:
+                        DataChoose=pd.DataFrame([],columns=['cycleid', 'eva_chamber', 'groupid', 'line', 'port', 'product_id'])
+                        data2=pd.DataFrame([],columns=['groupid', 'product_id', 'line', 'eva_chamber', 'port', 'eventtime',
+                           'mask_id', 'mask_set', 'glass_id', 'pos_x', 'pos_y', 'x_label',
+                           'y_label', 'ppa_x', 'ppa_y', 'offset_x', 'offset_y', 'offset_tht',
+                           'cycleid'])
                     print (DataChoose)
+                    conn2.close()
+                    
                     
                      ## 若DataChoose 已存在于 offset_table中则不计算
-                    if len(DataChoose):    
-                        
+                    if len(DataChoose):                    
                         del DataChoose['port']   ## DataChoose 不应该带有 Port 信息
                         conn2 =Mysql(**init['datebase2'])
                         if "offset_table" in conn2.list_table():
@@ -225,20 +268,28 @@ if __name__=="__main__":
                         ## df3 仅是用于计算的 数据源
                         st = time.time()
                         
-                        df3.to_pickle('optimize.pk')
+#                        df3.to_pickle('optimize.pk')
                         res=df3.groupby(['product_id', 'groupid','line','eva_chamber','port','cycleid']).apply(cal_optimized_offset)
                         res = pd.merge(res.reset_index(),df2[['product_id', "groupid",'line','eva_chamber','port','cycleid',\
-                                       "mask_set",'glasscount', 'starttime', 'endtime']].drop_duplicates(),\
+                                       "mask_id","mask_set",'glasscount', 'starttime', 'endtime']].drop_duplicates(),\
                                        on = ['product_id', "groupid",'line','eva_chamber','port','cycleid']) 
                         ## 获取每个cycle 颗粒度下的 'groupid','glasscount', 'starttime', 'endtime' 静态属性
                         res.columns = res.columns.str.replace(".",'')
-                        res.to_pickle("offset_table.pk")
+#                        res.to_pickle("offset_table.pk")
+                        
+#                        res.to_csv(os.path.join(FilePath,'offset_table.csv'))
                         conn2 =Mysql(**init['datebase2'])
                         if "offset_table" not in conn2.list_table():
                             conn2.creat_table_from_df("offset_table",res)
                         conn2.insert_df("offset_table",res)
                         conn2.close()
                         logger.info("Cal_Optimized_Offset Cal Time %02.fs"%(time.time()-st))
+
+                        try:
+                            InsertCIM(res,init['datebase3'])
+                            logger.info("完成CIM表插入")
+                        except:
+                            pass
                         
                         logger.info('获取本次需计算的PPA数据 ,数据 shape : %s ,耗时 :  %0.2fs'%(str(df2.shape),time.time()-st))
                         

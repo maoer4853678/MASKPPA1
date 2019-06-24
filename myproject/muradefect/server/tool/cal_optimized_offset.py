@@ -176,7 +176,7 @@ def cal_optimized_offset(p2):
     #找到计算平均得到的offset值最接近的meshgrid点
     
     r2[['delta_x', 'delta_y']] = (r2[['delta_x', 'delta_y']] * 2).round()/ 2.0
-    r2['delta_T'] = r2['delta_T'].round()
+    r2['delta_t'] = r2['delta_t'].round()
     r2['offset_x'] = p2['offset_x'].mean()
     '''p2的X,Y,T来自maskID，具体意义尚不知'''
     r2['offset_y'] = p2['offset_y'].mean()

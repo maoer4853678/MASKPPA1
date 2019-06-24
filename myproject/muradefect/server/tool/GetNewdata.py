@@ -23,25 +23,30 @@ def Pmaskid(Glass_ID,conn):
     '''%(str(Glass_ID)[1:-1])
     p1 = pd.read_sql_query(sql, conn)
     if not (len(p1)):
-        return pd.DataFrame([])
+        return pd.DataFrame([],columns = ['product_id','glass_id','eva_chamber'])
     p1.columns = p1.columns.str.lower()
     p1 = p1.rename({'productname': 'glass_id','productspecname': 'product_id'}, axis=1)
-    p2 = p1[p1.itemname.str.contains('mask_id|sub_id|align_offset')]
+    p2 = p1[p1.itemname.str.contains('MASK_ID|SUB_ID|ALIGN_OFFSET')]
     p3 = p2[['product_id', 'glass_id', 'subunitname', 'itemname',
              'sitevalue', 'eventtime']]
     p3['port'] = p3.itemname.str[3]
     p3.itemname = p3.itemname.str.replace('EV_A_|EV_B_|ALIGN_OFFSET1_', '') #语法有改善空间
     p4 = p3.set_index(['product_id', 'glass_id', 'subunitname', 'eventtime',
-                       'port', 'itemname']).unstack()   
+                       'port', 'itemname']).unstack()
     p4.columns = p4.columns.levels[1]
+    p4.columns=p4.columns.str.lower()
     p4 = p4.reset_index()
     p4.columns.name=None
-    p4 = p4[p4.glass_id == p4.SUB_ID].drop(['SUB_ID'], axis=1)
+    print ("p4.shape",p4.shape)
+    print (p4.columns)
+    if not len(p4) or "sub_id" not in p4.columns.tolist():
+        return pd.DataFrame([],columns = ['product_id','glass_id','eva_chamber'])
+    p4 = p4[p4.glass_id == p4.sub_id].drop(['sub_id'], axis=1)
     p4['mask_set'] = p4.mask_id.str[-4:]
     p4['eva_chamber'] = 'OC_'+p4.subunitname.str[-2]
     p4['line'] = p4.subunitname.str[-1]
     p4 = p4.drop(['subunitname'], axis=1).\
-         rename({'x': 'offset_x','Y': 'offset_y','tht': 'offset_tht'}, axis=1)
+         rename({'x': 'offset_x','y': 'offset_y','tht': 'offset_tht'}, axis=1)
     p4 = p4.sort_values(['product_id', 'glass_id', 'eva_chamber','eventtime']).drop_duplicates(['product_id', 'glass_id', 'eva_chamber'],keep='last') 
     p4=p4.apply(pd.to_numeric,errors='ignore')
     p4.eventtime=pd.to_datetime(p4.eventtime)
@@ -51,6 +56,7 @@ def PPA(starttime,endtime,conn):
     sql_ppa='''
     SELECT
       T1.glass_id,
+      glass_start_time,
       T2.eva_chamber,
       T1.product_id,
       T2.pos_x,
@@ -63,33 +69,38 @@ def PPA(starttime,endtime,conn):
       T1.TEG_COUNT
     FROM edadb.EDA_EVA_PPA_GLASS_INFO T1
     left join edadb.EDA_EVA_PPA_RAW T2 on t1.glass_key = t2.glass_key
-    where glass_start_time  > = TO_DATE('2019-06-15 10:00:00','YYYY-MM-DD HH24:MI:SS')
-    and  glass_start_time  <  TO_DATE('2019-06-15 11:00:00','YYYY-MM-DD HH24:MI:SS')
+    where glass_start_time  >= TO_DATE('%s','YYYY-MM-DD HH24:MI:SS')
+    and  glass_start_time  <  TO_DATE('%s','YYYY-MM-DD HH24:MI:SS')
     AND product_id NOT like ('%%MQC%%')
     '''%(starttime,endtime)
     P0 = pd.read_sql_query(sql_ppa, conn)
     if not (len(P0)):
         return pd.DataFrame([])
-    P0 = P0.dropna(axis=1, how='all').drop_duplicates()    
-    P0.columns = P0.columns.str.lower()  
-    P0.eva_chamber = P0.eva_chamber.str.replace(' ', '')    
+    P0 = P0.dropna(axis=1, how='all').drop_duplicates()   
+    P0.columns = P0.columns.str.lower()
     P0.glass_start_time = pd.to_datetime(P0.glass_start_time)
-    P0.GLASS_END_TIME = pd.to_datetime(P0.GLASS_END_TIME)
+    P0.eva_chamber = P0.eva_chamber.str.replace(' ', '')    
     P0 = P0[P0.glass_id.str.startswith('L2E')]
     P1 = P0[(~P0.ppa_x.isna()) &
             (~P0.product_id.isna())]
-    P2 = P1.sort_values(['glass_id', 'eva_chamber', 'POINT_NO','glass_start_time']).drop_duplicates(['glass_id', 'eva_chamber', 'POINT_NO'],keep='first') 
-    P2.eva_chamber = P2.eva_chamber.map({'OC_B\'':'OC_3',
+    #P2 = P1.sort_values(['glass_id', 'eva_chamber','glass_start_time']).drop_duplicates(['glass_id', 'eva_chamber'],keep='first') 
+    P1.eva_chamber = P1.eva_chamber.map({'OC_B\'':'OC_3',
                                          'OC_B'  :'OC_4',
                                          'OC_G\'':'OC_5',
                                          'OC_G'  :'OC_6',
                                          'OC_R\'':'OC_7',
                                          'OC_R'  :'OC_8'})
-    P2.pos_x = P2.pos_x.apply(lambda x: round(x, 3))
-    P2.pos_y = P2.pos_y.apply(lambda x: round(x, 3))
-    p1 = P2.sort_values(['glass_start_time'])
-    TagN=int(p1.TEG_COUNT.unique())
+    P1.pos_x = P1.pos_x.apply(lambda x: round(x, 3))
+    P1.pos_y = P1.pos_y.apply(lambda x: round(x, 3))
+    p1 = P1.sort_values(['glass_start_time'])
+#    TagN=int(p1.teg_count.unique())
     p1=Get_Label(p1)
+#    print (p1.shape)
+#    print (p1.head())
+    p1 = ResetValue(p1) ## 9999 插值  
+#    print (p1.shape)
+#    print (p1.head())
+    
     return p1
 
 #def Get_Label0(df):
@@ -108,19 +119,32 @@ def PPA(starttime,endtime,conn):
 #    df['y_label']= df['y_label'].astype(int)
 #    return df
 
-def Get_Label(df,TagN):
-    var=df[(df.glass_id==df.iloc[0,]['glass_id'])&(df.eva_chamber==df.iloc[0,]['eva_chamber'])]
-    temp_y=var.pos_y.astype(int).drop_duplicates().sort_values()
-    y=temp_y[temp_y.diff().fillna(10)>5]
-    ybins=GetBins(y)
-    df['y_label'] = pd.cut(df.pos_y,bins = ybins,labels=range(1,len(ybins))[::-1])
-    df['y_label']= df['y_label'].astype(int)
+def Get_Label(df):
+     def func(var):
+         temp_y=var.pos_y.astype(int).drop_duplicates().sort_values()
+         y=temp_y[temp_y.diff().fillna(10)>5]
+         ybins=GetBins(y)
+         var['y_label'] = pd.cut(var.pos_y,bins = ybins,labels=range(1,len(ybins))[::-1])
+         var['y_label']= var['y_label'].astype(int)
+         var = var.sort_values(['y_label','pos_x'])
+         panel_x = int(var.panel_x.iloc[0])
+         teg_count = int(var.teg_count.iloc[0])
+         var['x_label'] = np.repeat(range(panel_x),teg_count).tolist()*len(var['y_label'].unique())
+         return var
+     df = df.groupby(['glass_id','eva_chamber']).apply(func)
     
-    df['x_label']=df.sort_values(['y_label','pos_x']).reset_index().index//3+1
-    temp=df.sort_values(['pos_y','pos_x'])
-    temp.index=range(len(temp))    
-    temp['x_label']=temp.index//TagN+1
-    return temp
+#    var=df[(df.glass_id==df.iloc[0,]['glass_id'])&(df.eva_chamber==df.iloc[0,]['eva_chamber'])]
+#    
+#    y=temp_y[temp_y.diff().fillna(10)>5]
+#    ybins=GetBins(y)
+#    df['y_label'] = pd.cut(df.pos_y,bins = ybins,labels=range(1,len(ybins))[::-1])
+#    df['y_label']= df['y_label'].astype(int)
+#    
+#    #df['x_label']=df.sort_values(['y_label','pos_x']).reset_index().index//TagN+1
+#    temp=df.sort_values(['pos_y','pos_x'])
+#    temp.index=range(len(temp))    
+#    temp['x_label']=temp.index//TagN+1
+     return df
 
 def GetBins(x,gap=50):
     ## 通过坐标生成bins
@@ -141,8 +165,10 @@ def DataCollect(starttime,endtime,conn):
     else:
         Glass_ID=DF1.glass_id.unique().tolist()
         ##步骤2：maskID数据 
-        DF2=Pmaskid(Glass_ID,conn1)
+        DF2=Pmaskid(Glass_ID,conn)
         ##步骤3：合并
+        if not len(DF2):
+            return pd.DataFrame([],columns=col)
         DF=pd.merge(DF1,DF2,on=['product_id','glass_id','eva_chamber']) 
         DF=DF[col]   
     return DF
@@ -334,21 +360,30 @@ def GetCalPPA(DataChoose,data2,conn,number = 3):
     cal2_ppa_1 = pd.merge(data3,temp,on=['product_id', 'groupid', 'line', 'eva_chamber', 'cycleid'])
     
     if len(temp) !=0:
+#        sql = '''
+#          select distinct product_id,groupid,line,eva_chamber,eventtime from eva_all t1 where eventtime in(
+#            select distinct eventtime from eva_all 
+#            where 
+#            line = t1.line and 
+#            product_id = t1.product_id and 
+#            groupid = t1.groupid and 
+#            eva_chamber = t1.eva_chamber
+#            order by eventtime desc
+#            limit %d
+#            )
+#            group by product_id,groupid,line,eva_chamber,eventtime
+#        '''%number
         sql = '''
-          select distinct product_id,groupid,line,eva_chamber,eventtime from eva_all t1 where eventtime in(
-            select distinct eventtime from eva_all 
-            where 
-            line = t1.line and 
-            product_id = t1.product_id and 
-            groupid = t1.groupid and 
-            eva_chamber = t1.eva_chamber
-            order by eventtime desc
-            limit %d
-            )
-            group by product_id,groupid,line,eva_chamber,eventtime
+          select distinct product_id,groupid,line,eva_chamber,eventtime 
+              from eva_all order by eventtime desc limit 10000
         '''%number
+        df2_sql = pd.read_sql_query(sql,conn.obj.conn)
+        df2_sql = df2_sql.sort_values('eventtime',ascending=False)
+        df2 = df2_sql.groupby(["product_id","groupid",\
+                "line","eva_chamber"]).apply(lambda x:x['eventtime'].iloc[:3]).reset_index()
+        df2 = df2.drop("level_2",axis=1)
         #### df2 是 通过 'line','eva_chamber'分组后 每组下最后的三个 eventtime
-        df2 = pd.read_sql_query(sql,conn.obj.conn)
+#        df2 = pd.read_sql_query(sql,conn.obj.conn)
         #### cal2 只取 df2 对本次需要不全的temp的 'line','eva_chamber'进行筛选
         cal2 = pd.merge(df2,temp,on = ["product_id","groupid",'line','eva_chamber']).sort_values('eventtime')
         ####  cal2_ppa 是 按照 "line", "eva_chamber",  "eventtime" 到数据库中选取数据的 
@@ -378,6 +413,7 @@ def GetCalPPA(DataChoose,data2,conn,number = 3):
     df = pd.concat(res)
     df = df.sort_values(['line','eva_chamber','mask_set','eventtime'])
     return df
+
 
 
 def CreateOffsetAfter(g):
@@ -420,3 +456,51 @@ def Alarm(df,threshold={},exclude=[],conn=None):
     else:
         return False
     
+    
+def ResetValue(df):
+    df = df.sort_values(['glass_id','eva_chamber','pos_x','pos_y'])
+    df.index = range(len(df))
+    df.ppa_x = df.ppa_x.replace(9999,np.nan)
+    df.ppa_x = df.ppa_x.replace(-9999,np.nan)
+    df.ppa_y = df.ppa_y.replace(-9999,np.nan)
+    df.ppa_y = df.ppa_y.replace(9999,np.nan)
+    
+    df1 = df.dropna(how ="any")
+    df1["area"] = df['panel_x'].astype(float)*df['panel_y'].astype(float)
+    res = df1.groupby(['glass_id','eva_chamber']).agg({'teg_count':len,"area":"mean"})\
+        .reset_index()
+    res1 = res[res['teg_count']!=res['area']] ## 出现有NaN值的 数据了
+    df1 = df1.drop("area",axis=1)
+    ##  df2为 需要处理的数据
+    if len(res1)!=0:
+        df['bz'] = range(len(df))
+        df2 = pd.merge(df,res1[['glass_id',"eva_chamber"]].drop_duplicates(),\
+                 on = ['glass_id',"eva_chamber"])
+        rightdf = df[~df['bz'].isin(df2['bz'])] ## 无异常的数据
+        rightdf = rightdf.drop("bz",axis=1)
+        df2 = df2.drop("bz",axis=1)
+        rightdf = rightdf.dropna()
+        def func(g):
+            for key in ['ppa_x','ppa_y']:
+                temp = pd.pivot_table(g,index = 'x_label',\
+                    columns = 'y_label',values = key)
+                temp = temp[temp.columns.sort_values()]
+                temp = temp.sort_index()
+                s = g[['ppa_x','ppa_y','x_label','y_label']]
+                s['index'] = s.index
+                s1 = s[s[key].isnull()]
+                for i in s1.index:
+                    index = s1.loc[i,'index']
+                    x_label = s1.loc[i,"x_label"]
+                    y_label = s1.loc[i,"y_label"]
+                    temp1 = temp.loc[x_label-1:x_label+1,y_label-1:y_label+1]
+                    temp2 = pd.Series(temp1.values.reshape(len(temp1)*len(temp1.columns)))
+                    g.loc[index,key] = temp2.mean() 
+            return g
+        df2 = df2.groupby(['glass_id',"eva_chamber"]).apply(func)
+        df2.index = range(len(df2))
+        res = rightdf.append(df2)
+        res.index = range(len(res))
+        return res
+    else:
+        return df1

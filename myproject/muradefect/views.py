@@ -101,8 +101,9 @@ def GenerateTable(df):
     df.columns = df.columns.str.upper()
     df1 = df.dtypes.astype(str).reset_index()
     df1.columns = ['name','type']
-    df[df1[df1['type']=='datetime64[ns]']['name']]=\
-        df[df1[df1['type']=='datetime64[ns]']['name']].astype(str)
+    if len(df[df1[df1['type']=='datetime64[ns]']['name']])!=0:
+        df[df1[df1['type']=='datetime64[ns]']['name']]=\
+            df[df1[df1['type']=='datetime64[ns]']['name']].astype(str)
     df1['type'] = df1['type'].map(d)
     df[df1[df1['type']=='float']['name']] = \
         df[df1[df1['type']=='float']['name']].round(3)
@@ -121,20 +122,50 @@ def GenerateTable(df):
     return data,fields
 
 
-def plot_data(df):
+def plot_data(df,th=4,weight = 5.5):
     ppa_teg = []
     ppa_ver = []
     ppa_hor = []
+    th_middle = []
+    th_left = []
+    th_right = []
     if len(df)!=0:
-        df = df.sort_values(['pos_y', 'pos_x'])
+        df = df.sort_values(['x_label', 'y_label'])
         ppa_teg = df[['pos_x', 'pos_y']].values.tolist()
-        df.ppa_x = df.pos_x + 10 * df.ppa_x
-        df.ppa_y = df.pos_y + 10 * df.ppa_y
+        df.ppa_x = df.pos_x + weight * df.ppa_x
+        df.ppa_y = df.pos_y + weight * df.ppa_y
         ppa_ver = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('x_label'))) ## 垂直方向
         ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('y_label'))) ## 水平方向
-    plots = {"ppa_teg":ppa_teg,"PPA_X":ppa_ver,"PPA_Y":ppa_hor}
+        
+        df['pos_x_left'] = df['pos_x']-th*weight
+        df['pos_x_right'] = df['pos_x']+th*weight
+        df['pos_y_upper'] = df['pos_y']+th*weight
+        df['pos_y_lower'] = df['pos_y']-th*weight
+        x_middle = list(map(lambda x:x[1][['pos_x', 'pos_y']].values.tolist()\
+                           ,df.groupby('x_label'))) ## 垂直方向
+        x_left = list(map(lambda x:x[1][['pos_x_left', 'pos_y']].values.tolist()\
+                           ,df.groupby('x_label'))) ## 垂直方向
+        x_right = list(map(lambda x:x[1][['pos_x_right', 'pos_y']].values.tolist()\
+                           ,df.groupby('x_label'))) ## 垂直方向
+        
+        y_middle = list(map(lambda x:x[1][['pos_x', 'pos_y']].values.tolist()\
+                           ,df.groupby('y_label'))) ## 垂直方向
+        y_upper = list(map(lambda x:x[1][['pos_x', 'pos_y_upper']].values.tolist()\
+                           ,df.groupby('y_label'))) ## 垂直方向
+        y_lower = list(map(lambda x:x[1][['pos_x', 'pos_y_lower']].values.tolist()\
+                           ,df.groupby('y_label'))) ## 垂直方向
+        
+    xcoff = 1.15
+    ycoff = 1.3
+    pp = [df["pos_x"].min()*xcoff,df["pos_x"].max()*xcoff,\
+          df["pos_y"].min()*ycoff,df["pos_y"].max()*ycoff]
+    pp = list(map(lambda x:round(x,2),pp))
+    plots = {"ppa_teg":ppa_teg,"PPA_X":ppa_ver,"PPA_Y":ppa_hor,\
+             "x_middle":x_middle,"x_left":x_left,"x_right":x_right,\
+             "y_middle":y_middle,"y_upper":y_upper,"y_lower":y_lower,\
+             "pp":pp}
     return plots
 
 def BeforeData(glassid,chamber):
@@ -157,7 +188,6 @@ def AfterData(data):
     sql = "select delta_x,delta_y,delta_t from offset_table where %s"%conditon
     sql = sql%(product_id,eva_chamber,mask_set,port,groupid,line,cycleid)
     delta_args = pd.read_sql_query(sql, con=conn.obj.conn)
-    print (delta_args,"delta_args")
     if len(delta_args)>0:
         delta_x,delta_y,delta_tht = delta_args.iloc[0].tolist()
         ## 将该glass所在的组别中 offset结果作用于他
@@ -272,7 +302,7 @@ def GetOffset(request):
     line = request.POST.get("line") 
     sql = '''
     select product_id as productid,groupid,line,eva_chamber as chamber,\
-         port,cycleid,starttime,endtime, delta_x,delta_y, delta_t as delta_tht,\
+         port,cycleid,mask_id as maskid,starttime,endtime, delta_x,delta_y, delta_t as delta_tht,\
          offset_x, offset_y, offset_tht from offset_table  \
          where groupid =%s and cycleid = %s and PRODUCT_ID = '%s' and line = %s
     '''%(groupid,cycleid,product,line)
@@ -303,20 +333,23 @@ def DownLoad(request,filename):
     response['Content-Disposition']='attachment;filename="%s"'%filename
     return response
 
-def GetInfo(df,settings):
+def GetInfo(df,fields,settings):
     if len(df)==0:
-        return {}
-    infos ={}
-    for key in ['ppa_x','ppa_y']:
-        info = {}
-        
-            info[th+"_name"] = key1
-            info[th+"_len"]  = len(df[df[key].abs()<= float(settings[th])])
-            info[th+"_per"] = "%02.f%%"%(float(info[th+"_len"])/len(df)*100)      
-        info["min"] = round(df[key].min(),3)
-        info["max"] = round(df[key].max(),3)
-        infos[key.upper()] = info
-    return infos
+        return []
+    th2 = settings['th2']
+    th1 = settings['th1']
+    xy = {}
+    for key in ["ppa_x","ppa_y"]:
+        th2 = len(df[df[key].abs()<= float(th2)])
+        th1 = len(df[df[key].abs()<= float(th1)])
+        infos = [[th2,th1,df[key].max().round(2),df[key].min().round(2)]]
+        infos.append([str(round(th2/len(df)*100,2))+"%",str(round(th1/len(df)*100,2))+"%",'',''])
+        infos.append(['','','',''])
+        t = pd.DataFrame(infos,columns = fields)
+        t = t.astype(str)
+        datas,fil = GenerateTable(t)
+        xy[key] = datas
+    return xy,fil
 
 @need_logged_in
 def GetOpsPpa(request):
@@ -326,32 +359,23 @@ def GetOpsPpa(request):
     chamber = request.POST.get("chamber") 
     ## 优化前的 PPA数据  
     bdf = BeforeData(glassid,chamber)
-    print (bdf.shape,"bdf.shape")
     bplot = plot_data(bdf)
-    
     adf = AfterData(bdf)
-    print (adf.shape,"adf.shape")
     aplot = plot_data(adf)
     
     settings =  GetSP()   
-    glassinfo = {}
-    glassinfo["before"] =  GetInfo(bdf,settings)
-    glassinfo["after"] =  GetInfo(adf,settings)
-    
-    fields = ["±%sum"%(str(settings[th])) for th in ['th2','th1']]
-    fields+=['最大值','最小值']      
-    fields= pd.DataFrame(fields,columns = ['name'])
-    fields['type'] = 'text'
-    fields["sortable"] = True    
-    fields['align'] =  "center"
-    fields['hide'] = True
-    fields = list(df1.T.to_dict().values())
-    
-    
-#    data = list(df.T.to_dict().values())
-    
-
-    return HttpResponse(json.dumps({"before":bplot,"after":aplot,"glassinfo":glassinfo})\
+    cols = ["±%sum"%(str(settings[th])) for th in ['th2','th1']]
+    cols+=['最大值','最小值']
+    datas,fields = GetInfo(bdf,cols,settings)
+    bplot['data'] = datas
+    if len(adf):
+        datas,_ = GetInfo(adf,cols,settings)
+        aplot['data'] = datas
+    for key in fields:
+        key['width'] = 20
+#    x = fields.pop(1)
+#    fields.insert(0,x)
+    return HttpResponse(json.dumps({"before":bplot,"after":aplot,"fields":fields})\
                             ,content_type="application/json,charset=utf-8")
     
 def LogEtl(request):
@@ -406,11 +430,15 @@ def Ppa(request):
 @need_logged_in
 def Alarm(request):
     username=  request.session.get("username")
-    df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
-    df.columns = df.columns.str.upper()
-    data,fields = GenerateTable(df)
+    try:
+        df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
+        df.columns = df.columns.str.upper()
+        data,fields = GenerateTable(df)
+    except:
+        data = []
+        fields = []
     return render(request, 'alarm.html',{'username': username,"data":json.dumps(data),\
-                 "fields":json.dumps(fields)})
+                     "fields":json.dumps(fields)})
 
 @need_logged_in
 def Data(request):
