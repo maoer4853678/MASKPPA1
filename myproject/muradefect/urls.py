@@ -21,6 +21,7 @@ urlpatterns = [
     
     ## RestFul api
     path('log', views.LogEtl, name='log'),
+    path('setrateoption', views.SetRateOption, name='setrateoption'),
     path('download/<str:filename>', views.DownLoad, name='DownLoad'),
     path("getppa", views.GetPpa, name='getppa'),
     path("getoffset", views.GetOffset, name='getoffset'),

@@ -16,9 +16,32 @@
               <table>
                 <tbody>
                 {% csrf_token %}
-                {{ form.as_table }}
                 <tr>
-                    <td><input class="btn btn-success" type="submit" value="确定">
+                    <td>X方向管控限1</td><td>{{thxform.xth1}}</td>
+                    <td>X方向管控限2</td><td>{{thxform.xth2}}</td>
+                </tr>
+                <tr>
+                    <td>Y方向管控限1</td><td>{{thyform.yth1}}</td>
+                    <td>Y方向管控限2</td><td>{{thyform.yth2}}</td>
+                </tr>
+                
+                <tr>
+                    <td>PPAX单点报警上限</td><td>{{form.ppa_x}}</td>
+                    <td>PPAY单点报警上限</td><td>{{form.ppa_y}}</td>  
+                </tr>
+                <tr>
+                    <td>最低优化GLASS数</td><td>{{form.opsnumber}}</td>
+                    <td>最低优化阈值</td><td>{{form.offsetth}}</td>
+                </tr>
+                <tr>
+                <td>OFFSETX报警上限</td><td>{{form.offset_delta_x }}</td>
+                <td>OFFSETY报警上限</td><td>{{form.offset_delta_y }}</td>
+                </tr>
+                
+                <tr>
+                  <td>OFFSETTHETA报警上限</td><td>{{form.offset_delta_tht }}</td>
+                  <td> 报警邮箱设置 </td><td >{{form.email }} </td>
+                  <td><input class="btn btn-success" type="submit" value="保存基本设置" style="margin-left: 10px"></td>
                 </tr>
                 </tbody>
               </table>
@@ -29,11 +52,118 @@
         <label class="card-title m-t-10" id = "message" style="color: red"> 
                {{ message }} 
         </label>
+     </div>
+
+     <div class="container-fluid">
+        <div class="row">
+          <table>
+              <tbody>
+                <tr> 
+                    <td> 产品名称 </td>
+                    <td>
+                        <select style="width: 200px"  id="product">
+                            {% for product in products %}
+                                <option>{{ product }}</option>
+                            {% endfor %} 
+                       </select>
+                    </td>
+                    <td>
+                         
+                    </td>
+                    <td> <a  class="btn waves-effect waves-light btn-warning hidden-md-down"  id = "ensure" style="margin-left: 440px"> 保存合格率设置 </a>    </td>
+                <tr> 
+             </tbody>
+          </table>
+        </div> 
+    </div> 
+
+    <div class="container-fluid">
+        <div class="row">
+           <table>
+              <tbody>
+              <tr>
+                  <td>X方向/OC3合格率</td><td><input id = "xoc3" type="text" value="{{ xoc3 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>X方向/OC4合格率</td><td><input id = "xoc4" type="text" value="{{ xoc4 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>X方向/OC5合格率</td><td><input id = "xoc5" type="text" value="{{ xoc5 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+              </tr>
+              <tr>
+                  <td>X方向/OC6合格率</td><td><input id = "xoc6" type="text" value="{{ xoc6 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>X方向/OC7合格率</td><td><input id = "xoc7" type="text" value="{{ xoc7 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>X方向/OC8合格率</td><td><input id = "xoc8" type="text" value="{{ xoc8 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+              </tr>
+              </tbody>
+          </table>
+        </div>   
+    </div>
+    <div class="container-fluid">
+        <div class="row">
+          <table>
+              <tbody>
+              <tr>
+                  <td>Y方向/OC3合格率</td><td><input id = "yoc3" type="text" value="{{ yoc3 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>Y方向/OC4合格率</td><td><input id = "yoc4" type="text" value="{{ yoc4 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>Y方向/OC5合格率</td><td><input id = "yoc5" type="text" value="{{ yoc5 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+              </tr>
+              <tr>
+                  <td>Y方向/OC6合格率</td><td><input id = "yoc6" type="text" value="{{ yoc6 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>Y方向/OC7合格率</td><td><input id = "yoc7" type="text" value="{{ yoc7 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+                  <td>Y方向/OC8合格率</td><td><input id = "yoc8" type="text" value="{{ yoc8 }}" placeholder="请输入合格率" class="form-control form-control-line"></td>
+             </tr>
+              </tbody>
+          </table>
+
+        </div>
     </div>
 
 
 <script type="text/javascript">
-    // $("#message").css('color', 'red')
+var init1 = {{ init1|safe }}
+    $("#product").on("change", function(e) {
+        var values = init1[$("#product").val()]
+        keys = ['oc3','oc4','oc5','oc6','oc7','oc8']
+        xy = ['x','y']
+        for (var i = 0; i < 6; i++) {
+          for (var j = 0; j < 2; j++) {
+            item = xy[j]+keys[i]
+            document.getElementById(item).value = values[item]
+          }
+        }
+    });
+
+
+$("#ensure").click(function () {
+    var $formData=new FormData();
+    var keys = []
+    var values = []
+    ocs = ['oc3','oc4','oc5','oc6','oc7','oc8']
+    xy =  ['x','y']
+    for (var i = 0; i < 6; i++) {
+        for (var j = 0; j < 2; j++) {
+          item = xy[j]+ocs[i]
+          keys.push(item)
+          values.push($("#"+item).val())
+        }
+    }
+    var product_id = $("#product").val()
+    $formData.append("product_id",product_id);
+    $formData.append("keys",keys);
+    $formData.append("values",values);
+    $.ajax({
+        url:"/setrateoption",
+        type:"POST",
+        dataType:'json',
+        data:$formData,
+        contentType:false,
+        processData:false,
+        headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
+        success: function (res) { 
+            console.log(res)
+            window.location.href = "/option";       
+            alertify.success("修改成功") 
+        }
+      })
+})
+
 </script >
 
 {% endblock %}

@@ -59,6 +59,7 @@
                     <div class="breadcrumb">
                     <div id="PPA_X" style="width: 1150px;height:325px"></div>
                     </div>
+                    <label class="breadcrumb" id = 'PPA_X_des'></label>
 					<!-- <div class="breadcrumb" style="width: 420px ">
                     <table id="jqGrid" ></table>
                     </div> -->
@@ -66,6 +67,7 @@
                     <div class="breadcrumb">
                     <div id="PPA_Y" style="width: 1150px;height:325px;"></div>
                     </div>
+                    <label class="breadcrumb" id = 'PPA_Y_des'></label>
                    <!--  <div class="breadcrumb" style="width: 420px ">
                     <table id="jqGrid1" ></table>
                     </div> -->
@@ -73,30 +75,6 @@
                 </div>
 
 <script type="text/javascript">
-var fields = {{ fields|safe }}
-console.log(fields,"fields")
-
-// $("#jqGrid").jsGrid({
-//     width: "100%",
-//     height: "325px",
-//     inserting: false,
-//     editing: false,
-//     sorting: true,
-//     paging: true,
-//     data: [],
-//     fields: fields,
-// });
-// $("#jqGrid1").jsGrid({
-//     width: "100%",
-//     height: "325px",
-//     inserting: false,
-//     editing: false,
-//     sorting: true,
-//     paging: true,
-//     data: [],
-//     fields: fields,
-// });
-
 // 基于准备好的dom，初始化echarts实例
 var alldata = {{alldata |safe}} // {"before":{"PPA_X":[]}}
 var glassid = ''
@@ -110,7 +88,7 @@ var option = {
         trigger: 'axis'
     },
     legend: {
-        data: ['position','ppa',"threshold"],
+        data: ['position','ppa',"th1","th2"],
         show : true,
     },
     grid: {
@@ -167,23 +145,15 @@ var option = {
 function FreshData(select){
    var charts = ['PPA_X','PPA_Y']
 
-   var thsdict = {"PPA_X":['x_middle','x_left','x_right'],
-           "PPA_Y":['y_middle','y_upper','y_lower']}
-
    if (alldata[select].ppa_teg.length==0){
         alertify.error("该Glass未被优化") 
         return 
        }
    
-   // var fields = alldata.fields
-   // console.log(alldata[select]['data']['ppa_x'],"pppx")
-   // $("#jqGrid").jsGrid({data:alldata[select]['data']['ppa_x'],fields:fields,
-   //               height: "325px"})
-   // $("#jqGrid1").jsGrid({data:alldata[select]['data']['ppa_y'],fields:fields,
-   //               height: "325px"})
-   // console.log("table is all")
+   // PPA_X , PPA_Y 分别设置
    for (var chart = 0; chart <= charts.length; chart++) {
-       item = charts[chart]
+       item = charts[chart]  // PPA_X , PPA_Y
+       console.log(alldata[select]['infos'])
        var myChart = echarts.init(document.getElementById(item));
        if (select=='before')
        {
@@ -200,30 +170,37 @@ function FreshData(select){
             data:alldata[select]["ppa_teg"]}
        series = [scatter]
        
-       ths = thsdict[item]
-       colors = ['gray','red','red']
-       for (var i = 0; i < ths.length; i++) {
-           var thdata = alldata[select][ths[i]]
-           for (var j = 0; j < thdata.length; j++) {
-                temp= {
-                name: "threshold",
-                type:'line',
-                symbolSize: 1,
-                lineStyle: {
-                normal: {
-                    type: 'dashed'
-                },
-                },
-                itemStyle: {
+       console.log(alldata[select],'alldata[select]')
+       var thsdict = alldata[select]['thresholds'][item]  // {'th1':{upper,lower},'th2':{upper,lower},"thname":''}
+       var thcolors = {"th1":"red","th2":"green"}
+       var thids = ["th1","th2"]
+       for (var thid = 0; thid < thids.length; thid++) {
+           var thname = thids[thid]
+           var colors = ["gray",thcolors[thname],thcolors[thname]]
+           var ths = [alldata[select]['thresholds'][item]['middle'],alldata[select]['thresholds'][item][thname]['upper'],alldata[select]['thresholds'][item][thname]['lower']]
+           for (var i = 0; i < ths.length; i++) {
+               var thdata = ths[i]
+               for (var j = 0; j < thdata.length; j++) {
+                    temp= {
+                    name: thname,
+                    type:'line',
+                    symbolSize: 1,
+                    lineStyle: {
                     normal: {
-                        color: colors[i]
+                        type: 'dashed'
+                    },
+                    },
+                    itemStyle: {
+                        normal: {
+                            color: colors[i]
+                        }
+                    },
+                    data:thdata[j]
                     }
-                },
-                data:thdata[j]
-                }
-                series.push(temp)
-           }   
-        }
+                    series.push(temp)
+               }   
+            }
+       }
 
        for (var i = 0; i < alldata[select][item].length; i++) {
            line = {
@@ -239,6 +216,7 @@ function FreshData(select){
             series.push(line)
        }
        option.series = series
+       console.log(alldata[select]["pp"],select)
        var pp = alldata[select]["pp"]
        option.xAxis.min = pp[0]
        option.xAxis.max = pp[1]
@@ -246,6 +224,7 @@ function FreshData(select){
        option.yAxis.max = pp[3]
        myChart.setOption(option);     
 
+       document.getElementById(item+'_des').innerHTML = alldata[select]['infos'][item];
     }
 }
 
@@ -272,6 +251,7 @@ $("#ensure").click(function () {
                 else {
                     alldata = data
                     FreshData("before")
+
                 }
         }
     })

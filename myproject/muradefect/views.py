@@ -8,7 +8,7 @@ from .models import User
 import json,os
 from .usercore import *
 
-from .forms import AddForm, GlassForm, GlassPlotForm,OptionForm,RegisterForm
+from .forms import AddForm, GlassForm, GlassPlotForm,OptionForm,RegisterForm,XOptionForm,YOptionForm
 #from .utils_db import db
 #from django.db import connection as conn
 import pandas as pd
@@ -82,12 +82,15 @@ def GetPpaData(starttime,endtime,product,maskids):
                              and product_id = '%s' and mask_id in (%s) \
                              "%(starttime,endtime,\
                              product,str(maskids)[1:-1]),con=conn.obj.conn)
-    th = 6.5
+    init =  GetSP()
+    xth = max(init['xth'].values())
+    yth = max(init['xth'].values())
+    ths = {"ppa_x":xth,"ppa_y":yth}
     res = []
     for mask_id in data.mask_id.unique():
         temp = data[data.mask_id==mask_id]
         res1 = temp.groupby("glass_id").apply(lambda y:y[['ppa_x','ppa_y']].apply\
-                    (lambda x:len(x[x.abs()<=th]),axis=0)/len(y)*100).round(2)
+                    (lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)/len(y)*100).round(2)
         res.append({"mask_id":mask_id,"glass_id":res1.index.tolist(),\
                     "ppa_x":res1['ppa_x'].tolist(),"ppa_y":res1['ppa_y'].tolist()})
     return res
@@ -121,51 +124,56 @@ def GenerateTable(df):
     data = list(df.T.to_dict().values())
     return data,fields
 
+def createplotth(df,label = 'x_label',th =4, weight = 4.5):
+    ths ={}
+    ths['thname'] = "±%sum"%th
+    if label=='x_label':
+        df['upper'] = df["pos_x"]+th*weight
+        df['lower'] = df["pos_x"]-th*weight
+        ths["upper"] = list(map(lambda x:x[1][["upper","pos_y"]].\
+               values.tolist(),df.groupby(label))) 
+        ths["lower"] = list(map(lambda x:x[1][["lower","pos_y"]].\
+               values.tolist(),df.groupby(label))) 
+    else:
+        df["upper"] = df["pos_y"]+th*weight
+        df["lower"] = df["pos_y"]-th*weight
+        ths["upper"] = list(map(lambda x:x[1][["pos_x","upper"]].\
+               values.tolist(),df.groupby(label))) 
+        ths["lower"] = list(map(lambda x:x[1][["pos_x","lower"]].\
+               values.tolist(),df.groupby(label)))
+    return ths
+    
 
-def plot_data(df,th=4,weight = 5.5):
-    ppa_teg = []
-    ppa_ver = []
-    ppa_hor = []
-    th_middle = []
-    th_left = []
-    th_right = []
+def plot_data(df,init,weightx = 3.1,weighty = 8.1):
+    ppa_teg,ppa_ver,ppa_hor,pp = [],[],[],[]
+    thresholds = {'PPA_X':{"th1":{},"th2":{}},'PPA_Y':{"th1":{},"th2":{}},"middle":[]}
     if len(df)!=0:
         df = df.sort_values(['x_label', 'y_label'])
         ppa_teg = df[['pos_x', 'pos_y']].values.tolist()
-        df.ppa_x = df.pos_x + weight * df.ppa_x
-        df.ppa_y = df.pos_y + weight * df.ppa_y
+        df.ppa_x = df.pos_x + weightx * df.ppa_x
+        df.ppa_y = df.pos_y + weighty * df.ppa_y
         ppa_ver = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('x_label'))) ## 垂直方向
         ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('y_label'))) ## 水平方向
         
-        df['pos_x_left'] = df['pos_x']-th*weight
-        df['pos_x_right'] = df['pos_x']+th*weight
-        df['pos_y_upper'] = df['pos_y']+th*weight
-        df['pos_y_lower'] = df['pos_y']-th*weight
-        x_middle = list(map(lambda x:x[1][['pos_x', 'pos_y']].values.tolist()\
-                           ,df.groupby('x_label'))) ## 垂直方向
-        x_left = list(map(lambda x:x[1][['pos_x_left', 'pos_y']].values.tolist()\
-                           ,df.groupby('x_label'))) ## 垂直方向
-        x_right = list(map(lambda x:x[1][['pos_x_right', 'pos_y']].values.tolist()\
-                           ,df.groupby('x_label'))) ## 垂直方向
+        thresholds["PPA_X"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\
+                  values.tolist(),df.groupby('x_label'))) 
+        thresholds["PPA_Y"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\
+                  values.tolist(),df.groupby('y_label'))) 
+        thresholds["PPA_X"]['th1'] = createplotth(df.copy(),label = 'x_label',th = init["xth"]["xth1"], weight = weightx)
+        thresholds["PPA_X"]['th2'] = createplotth(df.copy(),label = 'x_label',th = init["xth"]["xth2"], weight = weightx)
+        thresholds["PPA_Y"]['th1'] = createplotth(df.copy(),label = 'y_label',th = init["yth"]["yth1"], weight = weighty)
+        thresholds["PPA_Y"]['th2'] = createplotth(df.copy(),label = 'y_label',th = init["yth"]["yth2"], weight = weighty)
         
-        y_middle = list(map(lambda x:x[1][['pos_x', 'pos_y']].values.tolist()\
-                           ,df.groupby('y_label'))) ## 垂直方向
-        y_upper = list(map(lambda x:x[1][['pos_x', 'pos_y_upper']].values.tolist()\
-                           ,df.groupby('y_label'))) ## 垂直方向
-        y_lower = list(map(lambda x:x[1][['pos_x', 'pos_y_lower']].values.tolist()\
-                           ,df.groupby('y_label'))) ## 垂直方向
+        ## 用于调整 X，Y 量程的系数
+        xcoff = 1.15
+        ycoff = 1.3
+        pp = [df["pos_x"].min()*xcoff,df["pos_x"].max()*xcoff,\
+              df["pos_y"].min()*ycoff,df["pos_y"].max()*ycoff]
+        pp = list(map(lambda x:round(x,2),pp))
         
-    xcoff = 1.15
-    ycoff = 1.3
-    pp = [df["pos_x"].min()*xcoff,df["pos_x"].max()*xcoff,\
-          df["pos_y"].min()*ycoff,df["pos_y"].max()*ycoff]
-    pp = list(map(lambda x:round(x,2),pp))
-    plots = {"ppa_teg":ppa_teg,"PPA_X":ppa_ver,"PPA_Y":ppa_hor,\
-             "x_middle":x_middle,"x_left":x_left,"x_right":x_right,\
-             "y_middle":y_middle,"y_upper":y_upper,"y_lower":y_lower,\
-             "pp":pp}
+    plots = {"ppa_teg":ppa_teg,"PPA_X":ppa_ver,"PPA_Y":ppa_hor, "pp":pp,"thresholds":thresholds}
     return plots
 
 def BeforeData(glassid,chamber):
@@ -306,11 +314,17 @@ def GetOffset(request):
          offset_x, offset_y, offset_tht from offset_table  \
          where groupid =%s and cycleid = %s and PRODUCT_ID = '%s' and line = %s
     '''%(groupid,cycleid,product,line)
-    df = pd.read_sql_query(sql,con=conn.obj.conn)
-    df.columns = df.columns.str.upper()
-    data,fields = GenerateTable(df)
+    try:
+        df = pd.read_sql_query(sql,con=conn.obj.conn)   
+        df.columns = df.columns.str.upper()
+        data,fields = GenerateTable(df)
+    except:
+        data = fields = [],[]
+        conn.obj.conn.rollback()
+        
     return HttpResponse(json.dumps({"data":data,"fields":fields})\
-                            ,content_type="application/json,charset=utf-8")
+                                ,content_type="application/json,charset=utf-8")
+    
 @need_logged_in
 def DownOffset(request):
     print ("获取封装下载数据请求")
@@ -333,23 +347,40 @@ def DownLoad(request,filename):
     response['Content-Disposition']='attachment;filename="%s"'%filename
     return response
 
-def GetInfo(df,fields,settings):
+@need_logged_in
+def SetRateOption(request):
+    print ("获取修改合格率请求")
+    product_id = request.POST.get("product_id")
+    keys = request.POST.get("keys").split(",")
+    values = request.POST.get("values").split(",")
+    options = dict(zip(keys,values))      
+    SetRateTh(product_id,options)
+    return HttpResponse(json.dumps({"status":200}),content_type="application/json,charset=utf-8")
+
+def GetInfo(df,settings):
     if len(df)==0:
         return []
-    th2 = settings['th2']
-    th1 = settings['th1']
+    xth = settings['xth']
+    yth = settings['yth']
+    ths = {"ppa_x":{"th1":xth['xth1'],"th2":xth['xth2']},\
+           "ppa_y":{"th1":yth['yth1'],"th2":yth['yth2']}}
     xy = {}
     for key in ["ppa_x","ppa_y"]:
-        th2 = len(df[df[key].abs()<= float(th2)])
-        th1 = len(df[df[key].abs()<= float(th1)])
-        infos = [[th2,th1,df[key].max().round(2),df[key].min().round(2)]]
-        infos.append([str(round(th2/len(df)*100,2))+"%",str(round(th1/len(df)*100,2))+"%",'',''])
-        infos.append(['','','',''])
-        t = pd.DataFrame(infos,columns = fields)
-        t = t.astype(str)
-        datas,fil = GenerateTable(t)
-        xy[key] = datas
-    return xy,fil
+        th1 = ths[key]['th1']
+        th2 = ths[key]['th2']
+        info = '±%sum : '%str(th2)
+        l2 = len(df[df[key].abs()<= float(th2)])
+        p2 = round(l2/len(df)*100,2)
+        info+="%d次, %0.2f%%<br>"%(l2,p2)
+        
+        l1 = len(df[df[key].abs()<= float(th1)])
+        p1 = round(l1/len(df)*100,2)
+        info += '±%sum : '%str(th1)
+        info+="%d次, %0.2f%%<br>"%(l1,p1)
+        
+        info+="<br> 最大值: %0.2f<br>最小值: %0.2f"%(df[key].max(),df[key].min())      
+        xy[key.upper()] = info
+    return xy
 
 @need_logged_in
 def GetOpsPpa(request):
@@ -358,24 +389,19 @@ def GetOpsPpa(request):
     glassid = request.POST.get("glassid")
     chamber = request.POST.get("chamber") 
     ## 优化前的 PPA数据  
-    bdf = BeforeData(glassid,chamber)
-    bplot = plot_data(bdf)
-    adf = AfterData(bdf)
-    aplot = plot_data(adf)
+    init =  GetSP()  
     
-    settings =  GetSP()   
-    cols = ["±%sum"%(str(settings[th])) for th in ['th2','th1']]
-    cols+=['最大值','最小值']
-    datas,fields = GetInfo(bdf,cols,settings)
-    bplot['data'] = datas
+    bdf = BeforeData(glassid,chamber)
+    bplot = plot_data(bdf,init)
+    adf = AfterData(bdf.copy())
+    aplot = plot_data(adf,init)
+    
+    infos = GetInfo(bdf,init)
+    bplot['infos'] = infos
     if len(adf):
-        datas,_ = GetInfo(adf,cols,settings)
-        aplot['data'] = datas
-    for key in fields:
-        key['width'] = 20
-#    x = fields.pop(1)
-#    fields.insert(0,x)
-    return HttpResponse(json.dumps({"before":bplot,"after":aplot,"fields":fields})\
+        infos1 = GetInfo(adf,init)
+        aplot['infos'] = infos1
+    return HttpResponse(json.dumps({"before":bplot,"after":aplot})\
                             ,content_type="application/json,charset=utf-8")
     
 def LogEtl(request):
@@ -398,6 +424,11 @@ def index(request):
     if username:
         productdict = GetProductDict()
         masksetdict = GetUserMaskset()
+        ## 判断是否含有 新产品, 生成新产品的默认合格率配置文件 
+        init1 = GetRateTh()
+        diffs = set(productdict.keys()) - set(init1.keys())
+        for diff in diffs:
+            CreateRateTh(diff)
 #        res = GetPpaData(starttime,endtime,products[0],masksets[0])
         return render(request, 'index.html', {'username': username,"data":'[]',\
                 "productdict":productdict,"masksetdict":masksetdict})
@@ -453,17 +484,47 @@ def Data(request):
 @need_logged_in
 def Option(request):
     username=  request.session.get("username")
-    settings =  GetSP()
-    form = OptionForm(settings)
+    init =  GetSP()
+    init1 = GetRateTh()
+    products = list(init1.keys())
+    form = OptionForm(init['settings'])
+    thxform = XOptionForm(init['xth'])
+    thyform = YOptionForm(init['yth'])
+    response = {'username': username,"form":form,"thxform":thxform,\
+                "thyform":thyform,"message":"","status":200,\
+                "products":products,"init1":init1}
+    if len(products):
+        response.update(init1[products[0]])
     if request.method == 'POST':
         if GetRole(username):
             form = OptionForm(request.POST)
+            form1 = XOptionForm(request.POST)
+            form2 = YOptionForm(request.POST)
             if form.is_valid():
                 SetSP(form.cleaned_data)
-                return render(request, 'option.html', {'username': username,"form":form,\
-                                                       "message":"设置成功","status":200})
-        else:
-            return render(request, 'option.html', {'username': username,"form":form,\
-                                                   "message":"设置失败, 你不是管理员账户","status":400})
+#                return render(request, 'option.html',response )
+            if form1.is_valid():
+                SetSP(form1.cleaned_data,"xth")
+#                return render(request, 'option.html',response )
+            if form2.is_valid():
+                SetSP(form2.cleaned_data,"yth")
+    
+            init =  GetSP()
+            init1 = GetRateTh()
+            products = list(init1.keys())
+            form = OptionForm(init['settings'])
+            thxform = XOptionForm(init['xth'])
+            thyform = YOptionForm(init['yth']) 
+            response = {'username': username,"form":form,"thxform":thxform,\
+                "thyform":thyform,"message":"参数设置成功","status":200,"products":products,\
+                 "init1":init1}
+            if len(products):
+                 response.update(init1[products[0]])
+            return render(request, 'option.html',response )
         
-    return render(request, 'option.html', {'username': username,"form":form,"status":200})
+        else:
+            response["message"] = "设置失败, 你不是管理员账户"
+            response["status"] = 400
+            return render(request, 'option.html',response )
+    
+    return render(request, 'option.html', response)

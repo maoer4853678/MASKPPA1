@@ -247,7 +247,9 @@ def CycleJudge(df,conn):
     df2=df.sort_values(["product_id","groupid",'line','eva_chamber','port','eventtime']).\
         drop_duplicates(["product_id",'groupid','line','eva_chamber','port'],keep='first')\
         [['product_id','groupid','line','eva_chamber','port','eventtime','mask_set']]
-    DF_M=pd.concat([data_last,df2]).sort_values(['eventtime'])#必然有一部分行的cycleid是nan
+#    DF_M=pd.concat([data_last,df2]).sort_values(['eventtime'])#必然有一部分行的cycleid是nan
+    DF_M = data_last.append(df2)
+    DF_M = DF_M.sort_values(['eventtime'])
     #####新旧数据之间判别，将旧数据的相关标志位传给新数据
     DF_M2=DF_M.groupby(['product_id','groupid','line','eva_chamber','port']).apply(func2)
     DF_M2.index=range(len(DF_M2))
@@ -373,15 +375,22 @@ def GetCalPPA(DataChoose,data2,conn,number = 3):
 #            )
 #            group by product_id,groupid,line,eva_chamber,eventtime
 #        '''%number
+        cal2_ppa_1[['product_id','groupid','line']] = cal2_ppa_1[['product_id','groupid','line']].astype(int)
         sql = '''
           select distinct product_id,groupid,line,eva_chamber,eventtime 
-              from eva_all order by eventtime desc limit 10000
-        '''%number
+              from eva_all where  product_id in (%s) and groupid in (%s) and
+              line in (%s) and eva_chamber in (%s) 
+              order by eventtime desc limit 10000
+        ''' %(str(cal2_ppa_1.product_id.tolist())[1:-1],str(cal2_ppa_1.groupid.tolist())[1:-1],\
+           str(cal2_ppa_1.line.tolist())[1:-1],str(cal2_ppa_1.eva_chamber.tolist())[1:-1])
         df2_sql = pd.read_sql_query(sql,conn.obj.conn)
+        print (df2_sql.shape,"df2_sql.shape")
         df2_sql = df2_sql.sort_values('eventtime',ascending=False)
+        df2_sql.index = range(len(df2_sql))
         df2 = df2_sql.groupby(["product_id","groupid",\
-                "line","eva_chamber"]).apply(lambda x:x['eventtime'].iloc[:3]).reset_index()
-        df2 = df2.drop("level_2",axis=1)
+                "line","eva_chamber"]).apply(lambda x:x['eventtime'].iloc[:int(number)]).reset_index()
+#        print (df2.columns)
+        df2 = df2.drop("level_4",axis=1)
         #### df2 是 通过 'line','eva_chamber'分组后 每组下最后的三个 eventtime
 #        df2 = pd.read_sql_query(sql,conn.obj.conn)
         #### cal2 只取 df2 对本次需要不全的temp的 'line','eva_chamber'进行筛选
