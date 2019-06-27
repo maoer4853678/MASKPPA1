@@ -83,8 +83,10 @@ def cal_offseted_count(data, off=np.zeros(3)):
     return  rst
 
 
-def optimize_offset(p2):
+def optimize_offset(p2,ths):
     #用来分别计算每一个offset组下，调整后的ppa中良品的数量（如前文所说，全部合格则为4倍的行数）    
+    th1 = ths['th1']
+    th2 = ths['th2']
     st = time.time()
     offset = pd.DataFrame(OFFSETS)
     offset.columns = ['offset_x','offset_y','offset_t']
@@ -111,8 +113,8 @@ def optimize_offset(p2):
     print (datasets.shape)  
     
     datasets[["pos_y","pos_x"]] = datasets[["pos_y","pos_x"]].abs()
-    datasets['bz1'] = (datasets[["pos_y","pos_x"]]<6.5).sum(axis=1)
-    datasets['bz2'] = (datasets[["pos_y","pos_x"]]<4).sum(axis=1)
+    datasets['bz1'] = (datasets[["pos_y","pos_x"]]<th2).sum(axis=1)
+    datasets['bz2'] = (datasets[["pos_y","pos_x"]]<th1).sum(axis=1)
     datasets['rst'] = datasets['bz1']+datasets['bz2']*WEIGHT
     print (datasets.shape)  
     
@@ -152,7 +154,7 @@ def cal_ratio_bna(p3, off=np.zeros(3)):
     return pd.concat([b, a])
 
 
-def cal_optimized_offset(p2):
+def cal_optimized_offset(p2,ths):
     '''
     感觉这一部分有优化甚至逻辑修改的空间。
     需求是应对rst有多个最大值的情况。
@@ -160,7 +162,7 @@ def cal_optimized_offset(p2):
     另一方面，可能会造成offset值过大。
     '''
     #rst = optimize_offset(p2[['pos_x', 'pos_y', 'ppa_x', 'ppa_y']].values)
-    rst = optimize_offset(p2[['pos_x', 'pos_y', 'ppa_x', 'ppa_y']])
+    rst = optimize_offset(p2[['pos_x', 'pos_y', 'ppa_x', 'ppa_y']],ths)
     
     r1 = pd.DataFrame(OFFSETS)
     r1.columns = ['delta_x', 'delta_y', 'delta_t']

@@ -16,11 +16,13 @@ urlpatterns = [
     path('offset', views.Offset, name='offset'),
     path('ppa', views.Ppa, name='ppa'),
     path("alarm", views.Alarm, name='alarm'),
+    path("alarmrate", views.AlarmRate, name='alarm'),
     path("data", views.Data, name='data'),
     path("option", views.Option, name='option'),
     
     ## RestFul api
     path('log', views.LogEtl, name='log'),
+    path('clear', views.Clear, name='clear'),
     path('setrateoption', views.SetRateOption, name='setrateoption'),
     path('download/<str:filename>', views.DownLoad, name='DownLoad'),
     path("getppa", views.GetPpa, name='getppa'),

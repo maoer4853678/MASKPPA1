@@ -262,6 +262,14 @@ def Register(request):
     return render(request,'register.html')
 
 ################################################## Rest后台接口  ##############################################
+@need_logged_in  
+def Clear(request):
+    if request.is_ajax():
+        print ("获取NewSet数据请求")
+        table = request.POST.get("table")
+        conn.delete_table(table,1)
+        return HttpResponse(json.dumps({"status":200}),content_type="application/json,charset=utf-8")
+
 @need_logged_in
 def NewSet(request):
     if request.is_ajax():
@@ -472,6 +480,19 @@ def Alarm(request):
                      "fields":json.dumps(fields)})
 
 @need_logged_in
+def AlarmRate(request):
+    username=  request.session.get("username")
+    try:
+        df = pd.read_sql_query("select * from alarmrate ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
+        df.columns = df.columns.str.upper()
+        data,fields = GenerateTable(df)
+    except:
+        data = []
+        fields = []
+    return render(request, 'alarmrate.html',{'username': username,"data":json.dumps(data),\
+                     "fields":json.dumps(fields)})
+
+@need_logged_in
 def Data(request):
     username=  request.session.get("username")
     df = pd.read_sql_query("select * from eva_all ORDER BY EVENTTIME DESC limit 500 ",con = conn.obj.conn)
@@ -502,10 +523,8 @@ def Option(request):
             form2 = YOptionForm(request.POST)
             if form.is_valid():
                 SetSP(form.cleaned_data)
-#                return render(request, 'option.html',response )
             if form1.is_valid():
                 SetSP(form1.cleaned_data,"xth")
-#                return render(request, 'option.html',response )
             if form2.is_valid():
                 SetSP(form2.cleaned_data,"yth")
     

@@ -53,7 +53,7 @@ $("#clear").click(function () {
     alertify.confirm("确认框", function (e) {
      if (e) {
        var $formData=new FormData();
-        $formData.append("table","alarm");
+        $formData.append("table","alarmrate");
         $.ajax({
         url:"/clear",
         type:"POST",
@@ -65,7 +65,7 @@ $("#clear").click(function () {
         headers:{"X-CSRFToken":$('[name="csrfmiddlewaretoken"]').val()},
         success: function (res) {     
             alertify.success("清空报警记录成功") 
-            window.location.href = "/alarm"
+            window.location.href = "/alarmrate"
         }})
      } else {
      }

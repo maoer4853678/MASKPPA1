@@ -34,23 +34,24 @@ class OptionForm(forms.Form):
     ## 若初始值 需要从配置文件读取，需要重写 init
     ppa_x  = forms.FloatField(label = "PPAX报警上限")
     ppa_y  = forms.FloatField(label = "PPAY报警上限")
-    offset_delta_x  = forms.FloatField(label = "OFFSETX报警上限")
-    offset_delta_y  = forms.FloatField(label = "OFFSETY报警上限")
-    offset_delta_tht = forms.FloatField(label = "OFFSETTHETA报警上限")
+    delta_x  = forms.FloatField(label = "OFFSETX报警上限")
+    delta_y  = forms.FloatField(label = "OFFSETY报警上限")
+    delta_t = forms.FloatField(label = "OFFSETTHETA报警上限")
     opsnumber = forms.IntegerField(label = "最低优化GLASS数")
     offsetth  = forms.FloatField(label = "最低优化阈值")
-    email = forms.EmailField(label = "报警邮箱设置")
-    
+            
     def __init__(self,settings):
         super(OptionForm,self).__init__(settings)
-        for i in ["ppa_x","ppa_y","offset_delta_x","offset_delta_y",\
-                  "offset_delta_tht","opsnumber","offsetth"]:
+        for i in ["ppa_x","ppa_y","delta_x","delta_y",\
+                  "delta_t","opsnumber","offsetth"]:
             self.fields[i].initial = float(settings[i])
             self.fields[i].widget.attrs.update({'class': 'form-control'})
-        self.fields["email"].initial = settings["email"]
+        self.fields['email'] = forms.ChoiceField(choices=((1, '开启报警'),\
+                   (0, '关闭报警')),initial = int(settings['email']))
+        self.fields['email'].widget._empty_value = [int(settings['email'])]
         self.fields["email"].widget.attrs.update({'class': 'form-control'})
         self.fields["email"].widget.attrs.update({'style': 'width : 270px'})
-  
+#  
     
 class XOptionForm(forms.Form):
     ## 若初始值 需要从配置文件读取，需要重写 init
@@ -67,7 +68,6 @@ class YOptionForm(forms.Form):
     ## 若初始值 需要从配置文件读取，需要重写 init
     yth2 = forms.FloatField(label = "Y方向管控限2")
     yth1 = forms.FloatField(label = "Y方向管控限1")
-    
     
     def __init__(self,settings):
         super(YOptionForm,self).__init__(settings)

@@ -1,7 +1,16 @@
 #coding=utf-8
+'''
+王吉东做的更改：
+1、Pmaskid中：在line==2的情况下，port A/B改成 C/D
+
+
+'''
 import pandas as pd
 import itertools
 import numpy as np
+import json
+from .myemail import *
+import datetime
 
 def Pmaskid(Glass_ID,conn): 
     sql='''SELECT DISTINCT
@@ -41,10 +50,26 @@ def Pmaskid(Glass_ID,conn):
     print (p4.columns)
     if not len(p4) or "sub_id" not in p4.columns.tolist():
         return pd.DataFrame([],columns = ['product_id','glass_id','eva_chamber'])
+    
+    print (p4[['glass_id','sub_id']].head())
+    
     p4 = p4[p4.glass_id == p4.sub_id].drop(['sub_id'], axis=1)
+    
+    print ("p4.shape",p4.shape)
     p4['mask_set'] = p4.mask_id.str[-4:]
+    
+    print('p4.subunitname',p4.subunitname)
     p4['eva_chamber'] = 'OC_'+p4.subunitname.str[-2]
-    p4['line'] = p4.subunitname.str[-1]
+    
+    
+    
+    p4['line'] = p4.subunitname.str[-1]    
+    ####若line=2，port的A,B改成C,D
+    p4.loc[p4[(p4.line==2)&(p4.port=='A')].index,'port']='C'
+    p4.loc[p4[(p4.line==2)&(p4.port=='B')].index,'port']='D'
+    print (p4[['line','port']].head())
+    
+    
     p4 = p4.drop(['subunitname'], axis=1).\
          rename({'x': 'offset_x','y': 'offset_y','tht': 'offset_tht'}, axis=1)
     p4 = p4.sort_values(['product_id', 'glass_id', 'eva_chamber','eventtime']).drop_duplicates(['product_id', 'glass_id', 'eva_chamber'],keep='last') 
@@ -103,24 +128,8 @@ def PPA(starttime,endtime,conn):
     
     return p1
 
-#def Get_Label0(df):
-#    var=df[(df.glass_id==df.glass_id[0])&(df.eva_chamber==df.eva_chamber[0])]
-##    var.pos_x.astype(int).unique()    
-##    var.pos_y.astype(int).unique()
-#    temp_x=var.pos_x.astype(int).drop_duplicates().sort_values()
-#    x=temp_x[temp_x.diff().fillna(10)>5]
-#    temp_y=var.pos_y.astype(int).drop_duplicates().sort_values()
-#    y=temp_y[temp_y.diff().fillna(10)>5]
-#    xbins=GetBins(x)
-#    ybins=GetBins(y)
-#    df['pos_y'] = pd.cut(df.pos_x,bins = xbins,labels=range(1,len(xbins)))
-#    df['pos_y']= df['pos_y'].astype(int)
-#    df['y_label'] = pd.cut(df.pos_y,bins = ybins,labels=range(1,len(ybins))[::-1])
-#    df['y_label']= df['y_label'].astype(int)
-#    return df
-
 def Get_Label(df):
-     def func(var):
+     def func0(var):
          temp_y=var.pos_y.astype(int).drop_duplicates().sort_values()
          y=temp_y[temp_y.diff().fillna(10)>5]
          ybins=GetBins(y)
@@ -131,19 +140,7 @@ def Get_Label(df):
          teg_count = int(var.teg_count.iloc[0])
          var['x_label'] = np.repeat(range(panel_x),teg_count).tolist()*len(var['y_label'].unique())
          return var
-     df = df.groupby(['glass_id','eva_chamber']).apply(func)
-    
-#    var=df[(df.glass_id==df.iloc[0,]['glass_id'])&(df.eva_chamber==df.iloc[0,]['eva_chamber'])]
-#    
-#    y=temp_y[temp_y.diff().fillna(10)>5]
-#    ybins=GetBins(y)
-#    df['y_label'] = pd.cut(df.pos_y,bins = ybins,labels=range(1,len(ybins))[::-1])
-#    df['y_label']= df['y_label'].astype(int)
-#    
-#    #df['x_label']=df.sort_values(['y_label','pos_x']).reset_index().index//TagN+1
-#    temp=df.sort_values(['pos_y','pos_x'])
-#    temp.index=range(len(temp))    
-#    temp['x_label']=temp.index//TagN+1
+     df = df.groupby(['glass_id','eva_chamber']).apply(func0)
      return df
 
 def GetBins(x,gap=50):
@@ -159,170 +156,83 @@ def DataCollect(starttime,endtime,conn):
     col=['product_id','eventtime','glass_id','eva_chamber','mask_id',
            'mask_set','port','line','pos_x','pos_y','x_label','y_label',
            'ppa_x','ppa_y','offset_x','offset_y','offset_tht']
+    print('###########    start ppa')
     DF1=PPA(starttime,endtime,conn)
+    print('###########    end ppa')
+    print ("DF1.shape",DF1.shape)
     if not len(DF1):
         DF=pd.DataFrame([],columns=col)
     else:
         Glass_ID=DF1.glass_id.unique().tolist()
         ##步骤2：maskID数据 
+        print('###########    start pmaskid')
         DF2=Pmaskid(Glass_ID,conn)
+        print('###########    end pmaskid')
+        print ("DF2.shape",DF2.shape)
         ##步骤3：合并
         if not len(DF2):
             return pd.DataFrame([],columns=col)
-        DF=pd.merge(DF1,DF2,on=['product_id','glass_id','eva_chamber']) 
+        print("DF2",DF2[['product_id','glass_id','eva_chamber','eventtime']])
+        print("DF1",DF1[DF1.glass_id.isin(DF2.glass_id)][['product_id','glass_id','eva_chamber']].drop_duplicates())
+        DF=pd.merge(DF1,DF2,on=['product_id','glass_id','eva_chamber'])
+        print ("DF.shape",DF.shape)
         DF=DF[col]   
     return DF
 
-def AddInitDataID(df):
-    df['groupid']=0
-    dfA=df[(df.eva_chamber==df.eva_chamber.min())&(df.port=='A')].sort_values(['groupid','line','eva_chamber','port','eventtime'])[['groupid','line','eva_chamber','port','eventtime','mask_set','glass_id']].drop_duplicates()
-    dfB=df[(df.eva_chamber==df.eva_chamber.min())&(df.port=='B')].sort_values(['groupid','line','eva_chamber','port','eventtime'])[['groupid','line','eva_chamber','port','eventtime','mask_set','glass_id']].drop_duplicates()
-    
-    dfA2=dfA.groupby(['line','eva_chamber','port']).apply(func1)
-    dfB2=dfB.groupby(['line','eva_chamber','port']).apply(func1)
-    
-    DATA=pd.concat([dfA2,dfB2])
-    DATA.index = range(len(DATA))
-    df=pd.merge(df,DATA,how='left',on = ['groupid', 'line', 'eva_chamber', 'port', 'eventtime', 'mask_set',\
-       'glass_id'])
-    df=df.sort_values(['glass_id','cycleid']).fillna(method='ffill')
-    df.cycleid=df.cycleid.astype(int)
-    df=df.sort_values(['groupid','line','eva_chamber','port','eventtime','mask_set','x_label','y_label'])
-    return df
-
-#def CycleJudge(df,conn):
-#    #####新CYCLE判断(groupby到新的颗粒度的基础上)
-#    df01=df[['line','eva_chamber','port','mask_set']].drop_duplicates()
-#    df_cj=df01.groupby(['line','eva_chamber','port'])['mask_set'].\
-#    apply(lambda x:[k for k, v in itertools.groupby(x)]).\
-#    reset_index().rename(columns={'mask_set':'mask_set_0'})
-#    df_cj['Cycle_num']=df_cj.mask_set_0.apply(len)
-#    DF00=pd.merge(df01,df_cj,on=['line','eva_chamber','port'])    
-#    #########针对Cycle_num=1的情况    
-#    DF100=DF00[DF00.Cycle_num==1]
-#    DF100.mask_set_0=DF100.mask_set_0.apply(lambda x:x[0])
-#    sql='''
-#    SELECT distinct eventtime, line, eva_chamber, port, mask_set from public.eva_all
-#    where (eventtime, line, eva_chamber, port) in(
-#    	SELECT max(eventtime),line,eva_chamber,port FROM public.eva_all
-#    	group by line,eva_chamber,port)
-#    '''
-#    DF_sql=pd.read_sql_query(sql,conn)
-#    DF_sql.columns=DF_sql.columns.str.upper()    
-#    data_choose1=DF100[DF100.mask_set!=DF100.mask_set_0][['line','eva_chamber','port','mask_set']]
-#    #########针对Cycle>1的情况
-#    DF200=DF00[DF00.Cycle_num>1]
-#    if len(DF200):
-#        DF200.mask_set_0=DF200.mask_set_0.apply(lambda x:x[0:-1])
-#        data_choose2 = DF200[DF200.apply(lambda x:x['mask_set'] in x['mask_set_0'],axis=1)].\
-#            drop(['mask_set_0',"Cycle_num"],axis=1).drop_duplicates()
-#    else:
-#        data_choose2 = pd.DataFrame([],columns=  ['line', 'eva_chamber', 'port', 'mask_set'])
-#
-#    data_choose=data_choose1.append(data_choose2)
-#    return data_choose
-def func1(value):
-    value2=value.sort_values(['eventtime'])
-    value2['cycleid']=(value2.mask_set!=value2.mask_set.shift(-1)).shift(1).fillna(0).astype(int)
-    value2['cycleid']=value2.cycleid.cumsum()
-    return value2
-
-def func2(value):
-    value2=value.sort_values(['eventtime'])
-    value2['cyclejudge']=(value2.mask_set!=value2.mask_set.shift(-1)).shift(1).fillna(0).astype(int)
-    value2['cycleid']=value2['cycleid'].fillna(method='ffill').fillna(0).astype(int)
-    value2['cycleid']=value2.cycleid+value2.cyclejudge
-    return value2
-
 def CycleJudge(df,conn):
-    #####新CYCLE判断(groupby到新的颗粒度的基础上)    
-    sql='''
-    SELECT distinct product_id,groupid, line, eva_chamber, port, eventtime,mask_set,CYCLEid from public.eva_all
-    where (eventtime, line, eva_chamber, port) in(
-     SELECT max(eventtime) as eventtime,line,eva_chamber,port FROM public.eva_all
-     group by line,eva_chamber,port)
-    '''
-    data_last=pd.read_sql_query(sql,conn)
-    #df2是新数据各个颗粒度的第一个数值;data_last有cycleid,df2没有cycleid，因此concat后会出现一些nan
-    df2=df.sort_values(["product_id","groupid",'line','eva_chamber','port','eventtime']).\
-        drop_duplicates(["product_id",'groupid','line','eva_chamber','port'],keep='first')\
-        [['product_id','groupid','line','eva_chamber','port','eventtime','mask_set']]
-#    DF_M=pd.concat([data_last,df2]).sort_values(['eventtime'])#必然有一部分行的cycleid是nan
-    DF_M = data_last.append(df2)
-    DF_M = DF_M.sort_values(['eventtime'])
-    #####新旧数据之间判别，将旧数据的相关标志位传给新数据
-    DF_M2=DF_M.groupby(['product_id','groupid','line','eva_chamber','port']).apply(func2)
-    DF_M2.index=range(len(DF_M2))
-    #
-    '''
-    df_m2是新数据每个颗粒度下首条，包含判别是否有跨周期的情况（cyclejudge为标志位）（这个在这一条没用上，在判断内部周期是否变化时会用上）
-    包含了：判断新数据的初始cycleid
-    '''
-    df_m=pd.merge(df2,DF_M2,on=["product_id",'groupid','line','eva_chamber','port','eventtime','mask_set'])
-    df_m2=df_m[['line', 'eva_chamber', 'port', 'eventtime', 'mask_set','product_id', 'groupid','cycleid']]
-    #判断是否需要计算，要以DF_M2为依据。
-    d0=DF_M2.groupby(['product_id', 'groupid','line','eva_chamber','port'])[['cyclejudge']].max()
-    d0=d0.reset_index()
-    d0['temp']=1
+    ## df 是本周期 获取的数据
+    groupid = pd.read_sql_query("select max(groupid) from eva_all",conn)['max'].iloc[0]
+    cycleid = pd.read_sql_query("select max(cycleid) from eva_all",conn)['max'].iloc[0]
+    
+    ###############
+    TimeNew=df.eventtime.min()
+    TimeOld=pd.read_sql_query("select max(eventtime) from eva_all",conn)['max'].iloc[0]
+    
+    if (pd.to_datetime(TimeNew)-pd.to_datetime(TimeOld))>pd.to_timedelta(36,unit='h'):
+        datachoose = [groupid,cycleid]
+        datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
+        groupid+=1
+        cycleid=0
+        df['groupid']=groupid
+        df['cycleid']=cycleid
+    else:
+        data = pd.read_sql_query("select distinct cycleid,port,mask_id,eventtime \
+                from eva_all where cycleid = %d and eva_chamber ='OC_8' "%cycleid,conn)
+        data = data.sort_values("eventtime").drop_duplicates("port",keep='last').\
+        drop("eventtime",axis=1)
+        cycleids = {}
+        for glass_id in df.glass_id.unique():
+            cycleids[glass_id] = cycleid
+            temp = df[df.glass_id==glass_id][['port','mask_id']].drop_duplicates()
+            ## 首先判断 port 在不在，不在的话，暂时无法判别其 cycleid，默认 为原cycleid
+            if temp.port.iloc[0] in data["port"].tolist():
+                temp1 = pd.merge(temp,data,on = ['port','mask_id'])
+                if len(temp1)==0:
+                    cycleids[glass_id] = cycleids[glass_id]+1        
+        ## cycleids 初次甄别完成
+        df1 = df[df.eva_chamber=='OC_8'][['glass_id','eventtime']].drop_duplicates().sort_values("eventtime")  
+        df1['cycleid'] = df1['glass_id'].map(cycleids)
+    
+        ## 对 新数据的 cycleid 做二次甄别，若按照eventtime排序后 cycleid 不能小于前面
+        ## 进行迭代修复，直到所有的 cycleid 都>=前面
+        for i in range(len(df1)):
+            df1['temp'] = df1["cycleid"].diff()
+            if len(df1[df1['temp']<0])==0:
+                break
+            df1.loc[df1[df1.temp<0].index,'cycleid'] = np.nan
+            df1["cycleid"]= df1["cycleid"].fillna(method = "ffill")
+        
+        cycleids = dict(zip(df1['glass_id'],df1["cycleid"]))
+        df['cycleid'] = df["glass_id"].map(cycleids)
+        df['groupid']=groupid
+        if df['cycleid'].max()!= cycleid:
+            datachoose = [groupid,cycleid]
+            datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
+        else:
+            datachoose = pd.DataFrame([],columns=['groupid','cycleid'])
+  
+    return df,datachoose
 
-    d1=pd.merge(DF_M2,d0,on=['product_id', 'groupid','line','eva_chamber','port','cyclejudge'],how='left').fillna(0)
-    data_choose1=d1[d1.temp==0][["product_id",'groupid','line','eva_chamber','port','cycleid']]
-    #####新数据内部判别+给新数据赋值cycleid
-    data2=df.groupby(['product_id', 'groupid','line','eva_chamber','port']).apply(func1).rename(columns={'cycleid':'cyclejudge'})
-    data2.index=range(len(data2))
-    ###df_m2有问题
-    data_new=pd.merge(data2,df_m2,how='outer').sort_values(['line', 'eva_chamber', 'port','eventtime'])
-    data_new.cycleid=data_new.cycleid.fillna(method='ffill')
-    data_new['cycleid']=data_new.cycleid+data_new.cyclejudge
-    print ("data_new.shape: ", data_new.shape)
-    ###  data_new 存在数据重复记录 
-    data_new = data_new.drop_duplicates()
-    print ("data_new.shape: ", data_new.shape)    
-    col=['groupid','product_id','line', 'eva_chamber', 'port', 'eventtime', 'mask_id','mask_set', \
-         'glass_id', 'pos_x','pos_y', 'x_label', 'y_label', 'ppa_x', 'ppa_y', 'offset_x',
-         'offset_y', 'offset_tht', 'cycleid']    
-    data_new2=data_new[col]
-    data_new3=data_new[['groupid',"product_id",'line','eva_chamber','port','cyclejudge','cycleid']]
-    temp0=data_new3.groupby(['groupid',"product_id",'line','eva_chamber','port'])[['cyclejudge']].max()#DCYCLE代表组内Cycle是否存在变化
-    temp0=temp0.reset_index()
-    temp0['temp']=1
-    temp1=pd.merge(data_new3,temp0,on=['groupid',"product_id",'line','eva_chamber','port','cyclejudge'],how='left').fillna(0)
-    data_choose2=temp1[temp1.temp==0][['groupid',"product_id",'line','eva_chamber','port','cycleid']]
-    data_choose=pd.concat([data_choose1,data_choose2]).drop_duplicates()
-    ## data_choose 可能全为空
-    return data_choose,data_new2
-
-#def GetCalPPA(DataChoose,conn):
-#    ####将输出的4列存到temp表中，覆盖式写入。 
-##    DataChoose.to_sql(name='temp',con=conn,if_exists='replace')
-#    conn.delete_table("temp")
-#    conn.creat_table_from_df("temp",DataChoose)
-#    conn.insert_df("temp",DataChoose)
-#    
-#    sql='''
-#    select * from public.eva_all inner join (
-#    select eventtime, line, eva_chamber, port, mask_set
-#    from(
-#     select eventtime, line, eva_chamber, port, mask_set,row_number()
-#     over(partition by (line, eva_chamber, port, mask_set)
-#       order by eventtime desc)as RowNumber
-#     from(SELECT distinct a.eventtime, a.line, a.eva_chamber, a.port, a.mask_set from public.eva_all as a
-#         inner join public.temp as b on
-#         (a.line=b.line and a.eva_chamber=b.eva_chamber and a.port=b.port and a.mask_set=b.mask_set)
-#         order by a.eventtime desc)as t1)as X
-#         where X.RowNumber<=3)as t3 on
-#     public.eva_all.eventtime=t3.eventtime and
-#     public.eva_all.line=t3.line and
-#     public.eva_all.eva_chamber=t3.eva_chamber and
-#     public.eva_all.port=t3.port and
-#     public.eva_all.mask_set=t3.mask_set 
-#    '''
-#    df = pd.read_sql_query(sql,conn.obj.conn)
-#    df=df.T.drop_duplicates().T.drop_duplicates()
-#    print (df.columns)
-#    df.columns = df.columns.str.upper()
-#    df = df.sort_values(['line','eva_chamber','mask_set','eventtime'])
-#    return df
 def Getcalmap(data,conn,tablename = 'eva_all'):
     conn.delete_table("temp")
     conn.creat_table_from_df("temp",data)
@@ -336,94 +246,53 @@ def Getcalmap(data,conn,tablename = 'eva_all'):
     data = pd.read_sql_query(sql,conn.obj.conn)
     return data
 
-def GetCalPPA(DataChoose,data2,conn,number = 3):
-    ####将输出的4列存到temp表中，覆盖式写入。 
-#    DataChoose.to_sql(name='temp',con=conn,if_exists='replace')
-    ## 本次1小时获取的数据中  存在需要计算的eva_all表
-    data2.groupid=data2.groupid.astype(int)
-    data2.cycleid=data2.cycleid.astype(int)
-    DataChoose.cycleid = DataChoose.cycleid.astype(int)
-    data3 = pd.merge(data2,DataChoose) 
-    df = Getcalmap(DataChoose,conn)
-    df = df.append(data3)  ## 完成发现需要计算 周期的 完整的 eva_all表
+def GetCalPPA(datachoose,conn,number = 3):
+    groupid=datachoose.groupid.tolist()[-1]
+    cycleid=datachoose.cycleid.tolist()[-1]
+    '''
+    sql1:取出指定cycle内所有的数据    
+    '''
+    sql1='''
+        select * from eva_all where groupid=%d and cycleid=%d
+        '''%(groupid,cycleid)
+    data1=pd.read_sql_query(sql1,conn)
+    ###########
+    '''
+    获得整个cycle数据的静态属性
+    '''
+    starttime=data1.eventtime.min()
+    endtime=data1.eventtime.max()
+    glasscount=len(data1.glass_id.unique())
     
-    cols = ["product_id","groupid",'line', 'eva_chamber','cycleid']
-    df1 = df[cols+['glass_id','eventtime']].drop_duplicates().groupby(cols).\
-        agg({"glass_id":len,"eventtime":['min',"max"]})
+    #############
+    Njudge1=data1[['mask_id','glass_id']].drop_duplicates()
+    NGlass=Njudge1.groupby('mask_id').count()    
+    MaskInCom=NGlass[NGlass.glass_id<number].index.tolist()
+    Add=0
+    if len(MaskInCom):
+        sql00 = '''
+              select distinct glass_id,eventtime from eva_all where mask_id in (%s)
+                  order by eventtime desc limit 3
+            ''' %(str(MaskInCom)[1:-1])
+        d0=pd.read_sql_query(sql00,conn)
+        GlassAdd=d0.glass_id.tolist()
+        if GlassAdd:
+            sql2 = '''
+                  select * from eva_all 
+                  where glass_id in (%s)
+                  and mask_id in (%s)                
+                ''' %(str(GlassAdd)[1:-1],str(MaskInCom)[1:-1])
+            data2=pd.read_sql_query(sql2,conn)
+            Add=1
+    if Add==0:
+        data=data1
+    else:
+        data=data1.append(data2).drop_duplicates()
     
-    ## 'glasscount','starttime','endtime' 为 本次需要组别的 所有真实静态属性 
-    static = ['glasscount','starttime','endtime'] 
-    df1.columns = static
-    df1 = df1.reset_index()
-
-    res = []
-    temp = df1[df1.glasscount<number]  ## 首先 获取 cal2 及不满足3组的数据
-    ## cal2_ppa_1 为 本次1小时中 需要计算的 但是glassid又不足 number 的eva_all表 +static
-    cal2_ppa_1 = pd.merge(data3,temp,on=['product_id', 'groupid', 'line', 'eva_chamber', 'cycleid'])
-    
-    if len(temp) !=0:
-#        sql = '''
-#          select distinct product_id,groupid,line,eva_chamber,eventtime from eva_all t1 where eventtime in(
-#            select distinct eventtime from eva_all 
-#            where 
-#            line = t1.line and 
-#            product_id = t1.product_id and 
-#            groupid = t1.groupid and 
-#            eva_chamber = t1.eva_chamber
-#            order by eventtime desc
-#            limit %d
-#            )
-#            group by product_id,groupid,line,eva_chamber,eventtime
-#        '''%number
-        cal2_ppa_1[['product_id','groupid','line']] = cal2_ppa_1[['product_id','groupid','line']].astype(int)
-        sql = '''
-          select distinct product_id,groupid,line,eva_chamber,eventtime 
-              from eva_all where  product_id in (%s) and groupid in (%s) and
-              line in (%s) and eva_chamber in (%s) 
-              order by eventtime desc limit 10000
-        ''' %(str(cal2_ppa_1.product_id.tolist())[1:-1],str(cal2_ppa_1.groupid.tolist())[1:-1],\
-           str(cal2_ppa_1.line.tolist())[1:-1],str(cal2_ppa_1.eva_chamber.tolist())[1:-1])
-        df2_sql = pd.read_sql_query(sql,conn.obj.conn)
-        print (df2_sql.shape,"df2_sql.shape")
-        df2_sql = df2_sql.sort_values('eventtime',ascending=False)
-        df2_sql.index = range(len(df2_sql))
-        df2 = df2_sql.groupby(["product_id","groupid",\
-                "line","eva_chamber"]).apply(lambda x:x['eventtime'].iloc[:int(number)]).reset_index()
-#        print (df2.columns)
-        df2 = df2.drop("level_4",axis=1)
-        #### df2 是 通过 'line','eva_chamber'分组后 每组下最后的三个 eventtime
-#        df2 = pd.read_sql_query(sql,conn.obj.conn)
-        #### cal2 只取 df2 对本次需要不全的temp的 'line','eva_chamber'进行筛选
-        cal2 = pd.merge(df2,temp,on = ["product_id","groupid",'line','eva_chamber']).sort_values('eventtime')
-        ####  cal2_ppa 是 按照 "line", "eva_chamber",  "eventtime" 到数据库中选取数据的 
-        cal2_ppa = Getcalmap(cal2[["product_id","groupid","line", "eva_chamber", "eventtime"]],conn)
-        ####  temp保留了 本次需要补全组的  cycleid 和  glasscount 信息，所以需要将 temp的这两个重要信息 merge回ppa数据
-        ###   cal2_ppa 中的 cycleid 在同一 'line','eva_chamber' 一定不止一个，但是这里需要改为一个
-        ####  cal2_ppa 是目前数据库中 提取到的 本次1小时内需要计算且 glassid不足 number的eva_all表 +static
-        cal2_ppa = pd.merge(cal2_ppa.drop("cycleid",axis=1),temp, on = \
-                            ["product_id","groupid",'line','eva_chamber'])
-        ## 此时的 cal2_ppa 能保证的是 同一 'line','eva_chamber'只有一个 cycleid
-        ## staic 是 这个cycle 真实的静态属性
-        cal2_ppa = cal2_ppa.append(cal2_ppa_1)
-        
-        res.append(cal2_ppa) ## 不足个数的补全后筛选
-    
-    data2.groupid=data2.groupid.astype(int)
-    data2.cycleid=data2.cycleid.astype(int)
-    conn.insert_df(tablename='eva_all',df=data2)  ##将本周期的所有数据插入到数据库中
-    
-    cal1 = df1[df1.glasscount>=number].drop(static,axis=1)
-    if len(cal1)>0:
-        cal1_ppa = Getcalmap(cal1,conn)
-        ## 并且确保 cycleid 在同一 'line', 'eva_chamber', 'port'是唯一的， 将 static merge到 cal1_ppa中
-        cal1_ppa = pd.merge(cal1_ppa,df1,on= cols)
-        res.append(cal1_ppa) ## 符合条件的数据t1.ev
-        
-    df = pd.concat(res)
-    df = df.sort_values(['line','eva_chamber','mask_set','eventtime'])
-    return df
-
-
+    data['glasscount']=glasscount
+    data['starttime']=starttime
+    data['endtime']=endtime
+    return data
 
 def CreateOffsetAfter(g):
     '''
@@ -438,33 +307,6 @@ def CreateOffsetAfter(g):
     t2['ppa_y'] = t2['ppa_y']+t2['deltax']+t2['deltat']*t2['pos_x'] * np.pi / 180 / 100
         
     return t2.drop(['deltax','deltay','deltat'],axis=1)
-
-def Alarm(df,threshold={},exclude=[],conn=None):
-    '''
-    df总出现重复列，需要研究原因
-    '''
-    columns = list((set(threshold.keys()) - set(exclude)).intersection(set(df.columns)))
-    def func(g):
-        rr = g[columns]
-        rr.index = range(len(rr))
-        res = rr.apply(lambda x:x[x.abs()>threshold[x.name]].\
-          describe().loc[['count','max','min']],axis=0).T.reset_index()\
-               .rename(columns ={"index":"key"})
-        return res
-
-    res = df.groupby(['line','eva_chamber','port','mask_set','glass_id','eventtime']).apply(func).reset_index()
-    ## 插入数据库
-    res = res[res['count']>0]
-    if len(res):
-        res = res.drop("level_6",axis=1)
-        res['line'] = res['line'].astype(int)
-        if 'alarm' not in conn.list_table():
-            conn.creat_table_from_df(tablename='alarm', df=res)
-        conn.insert_df(tablename='alarm',df=res)
-        return True
-    else:
-        return False
-    
     
 def ResetValue(df):
     df = df.sort_values(['glass_id','eva_chamber','pos_x','pos_y'])
@@ -504,12 +346,206 @@ def ResetValue(df):
                     y_label = s1.loc[i,"y_label"]
                     temp1 = temp.loc[x_label-1:x_label+1,y_label-1:y_label+1]
                     temp2 = pd.Series(temp1.values.reshape(len(temp1)*len(temp1.columns)))
-                    g.loc[index,key] = temp2.mean() 
+                    g.loc[index,key] = temp2.mean()
+                g[key] = g[key].fillna(g[key].mean())
             return g
-        df2 = df2.groupby(['glass_id',"eva_chamber"]).apply(func)
+        df2 = df2.groupby(['glass_id',"eva_chamber"]).apply(func)        
         df2.index = range(len(df2))
         res = rightdf.append(df2)
+        res=res.dropna()
         res.index = range(len(res))
         return res
     else:
         return df1
+    
+def AlarmPpa(df,init,exclude=[],conn=None):
+    ## 原始数据报警程序
+    alarmflag = False ## 异常值报警标识
+    threshold = init['threshold']
+    email = init['email']
+    emailflag =  email['flag']==1 and len(email['list'])!=0
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    rate = init['rate']
+    
+    columns = list((set(threshold.keys()) - set(exclude)).intersection(set(df.columns)))
+    def func(g):
+        rr = g[columns]
+        rr.index = range(len(rr))
+        res = rr.apply(lambda x:x[x.abs()>threshold[x.name]].\
+          describe().loc[['count','max','min']],axis=0).T.reset_index()\
+               .rename(columns ={"index":"key"})
+        return res
+    
+    res = df.groupby(['product_id','line','eva_chamber','mask_id','glass_id','eventtime']).\
+            apply(func).reset_index()
+    res = res[res['count']>0]
+    
+    if len(res):  ### 异常值触发 报警
+        print('PPA_X/Y 超限')
+        alarmflag = True
+        res = res.drop("level_6",axis=1)
+        res['line'] = res['line'].astype(int)
+        print(res)
+        df = pd.merge(df,res[['product_id','line','eva_chamber','mask_id','glass_id','eventtime','count']].\
+          drop_duplicates(),on = ['product_id','line','eva_chamber','mask_id','glass_id','eventtime'],how = "left")
+        error = df[~df['count'].isnull()]
+        df = df[df['count'].isnull()].drop("count",axis=1)  ##  那剔除某 PPA异常的数据，其他照常计算 
+        
+        messgae = error[['glass_id','mask_id','eva_chamber',\
+                     'eventtime','offset_x', 'offset_y', 'offset_tht']].drop_duplicates()
+        messgae['boffset'] =messgae[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
+                    .apply(lambda x:','.join(x),axis=1)
+        messgae = pd.merge(res,messgae,on = ['glass_id','mask_id','eva_chamber','eventtime'])
+        messgae.columns =messgae.columns.str.replace("_",'').str.upper()
+        messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
+        messgae['AOFFSET'] = ''
+        messgae = messgae[['PRODUCTID','GLASSID','MASKID','EVACHAMBER','EVENTTIME',\
+               'BOFFSET','AOFFSET','COUNT','MAX', 'MIN']]
+        print('PPA messgae',messgae)
+        if 'alarm' not in conn.list_table():
+            conn.creat_table_from_df(tablename='alarm', df=messgae)
+        conn.insert_df(tablename='alarm',df=messgae)
+
+        ### 触发邮箱报警, 并且已经过滤掉了 df中的异常数据
+        
+        if (len(messgae))&emailflag:
+            content='报警时间 %s \n\n报警详细信息\n\n'%(now)
+            content+= ' , '.join(messgae.columns)+"\n"
+            for i in messgae.index:
+                content+=' , '.join(messgae.loc[i,:])+" \n"
+   
+            m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
+                 title = 'PPA单点超限异常',
+                 content = content,
+                 ssl=True)
+            msg = m.send_mail()
+            print (msg)
+
+    ths = {"ppa_x":rate['th'][0],"ppa_y":rate['th'][1]}
+    def func1(g):
+        res = g[['ppa_x','ppa_y']].apply(lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)
+        res = res/len(g)*100
+        return res.round(3)
+    
+    for product in rate['product']:
+        temp = pd.Series(rate['product'][product]).to_frame()
+        temp = temp.astype(float)
+        temp.columns = ['value']
+        temp['type'] = "ppa_"+temp.index.str[0]+"_th"
+        temp['eva_chamber'] = "OC_"+temp.index.str[1:].str.replace("oc","")
+        temp["product_id"] = product
+        temp1 = temp.pivot_table(index = ['product_id','eva_chamber'],columns =\
+              'type',values = 'value',aggfunc = 'max').reset_index()
+         
+    res1 = df.groupby(['product_id','line','eva_chamber','port','mask_set','mask_id','glass_id','eventtime']).\
+            apply(func1).reset_index()
+    res1 = pd.merge(res1,temp1,on =['product_id','eva_chamber'])
+    temps = []
+    for key in ['ppa_x','ppa_y']:
+        temp = res1[res1[key]<=res1[key+"_th"]]
+        temp = temp[['product_id','glass_id','mask_id','eva_chamber',key,key+"_th"]]
+        temp = temp.rename(columns ={key:"value",key+"_th":"threshold"})
+        temp['field'] = key.upper()
+        temps.append(temp)
+    messgae = pd.concat(temps)
+        
+    if len(messgae):
+        alarmflag = True        
+        print('messgae',messgae)
+        messgae = pd.merge(df[['product_id', 'glass_id', 'mask_id', 'eva_chamber','eventtime',\
+          'offset_x','offset_y', 'offset_tht']].drop_duplicates(),messgae,\
+                on = ['product_id', 'glass_id', 'mask_id', 'eva_chamber'])
+        messgae['boffset'] =messgae[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
+                        .apply(lambda x:','.join(x),axis=1)
+        messgae.columns =messgae.columns.str.replace("_",'').str.upper()
+        messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
+#        messgae = messgae[["PRODUCTID",'GLASSID','MASKID','EVACHAMBER','EVENTTIME',\
+#                   'BOFFSET','FIELD','VALUE', 'THRESHOLD']]
+        if len(messgae):            
+            if 'alarmrate' not in conn.list_table():
+                conn.creat_table_from_df(tablename='alarmrate', df=messgae)
+                
+            conn.insert_df(tablename='alarmrate',df=messgae)
+            
+            if emailflag:
+                content='报警时间 %s \n\n报警详细信息\n\n'%(now)
+                content+= ' , '.join(messgae.columns)+"\n"
+                for i in messgae.index:
+                    content+=' , '.join(messgae.loc[i,:])+" \n"
+       
+                m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
+                     title = 'PPA占比超SPEC',
+                     content = content,
+                     ssl=True)
+                msg = m.send_mail()
+                print (msg)
+            
+    return alarmflag,df
+
+
+def AlarmOffset(df,init,exclude=[],conn=None):
+    ## 原始数据报警程序
+    alarmflag = False ## 异常值报警标识
+    threshold = init['threshold']
+    email = init['email']
+    emailflag =  email['flag']==1 and len(email['list'])!=0
+    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    columns = list((set(threshold.keys()) - set(exclude)).intersection(set(df.columns)))
+    def func(g):
+        rr = g[columns]
+        rr.index = range(len(rr))
+        res = rr.apply(lambda x:x[x.abs()>threshold[x.name]].\
+          describe().loc[['count','max','min']],axis=0).T.reset_index()\
+               .rename(columns ={"index":"key"})
+        return res
+    cols = ['product_id','port','eva_chamber','groupid','cycleid']
+    res = df.groupby(cols).\
+            apply(func).reset_index()
+    res = res[res['count']>0]
+    
+    if len(res):  ### 异常值触发 报警
+        alarmflag = True 
+        res = res.drop("level_%d"%(len(cols)),axis=1)
+        df = pd.merge(df,res.drop_duplicates(),on = cols,how = "left")
+        error = df[~df['count'].isnull()]
+        df = df[df['count'].isnull()].drop(["count",'min','max'],axis=1)  ##  那剔除某 OFFSET 调整异常的数据
+        try:
+            error['boffset'] =error[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
+                            .apply(lambda x:','.join(x),axis=1)
+            error['aoffset'] =error[['after_x', 'after_y', 'after_t']].astype(str)\
+                            .apply(lambda x:','.join(x),axis=1)  
+            conditon = ' and '.join(map(lambda x:" %s in (%%s)"%x,cols))
+            sql = "select distinct glass_id,mask_id,eventtime,%s from eva_all where %s"%(','.join(cols),conditon)
+            args = tuple(map(lambda x:str(error[x].tolist())[1:-1],cols))
+            temp = pd.DataFrame(conn.exec_(sql%(args)),columns =["glass_id",'mask_id','eventtime']+cols)
+            messgae = pd.merge(error,temp,on =cols)    
+            messgae.columns =messgae.columns.str.replace("_",'').str.upper()
+            messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
+            print('message,offset:')
+            print(messgae.columns)
+            print(messgae.shape)
+            messgae = messgae[['PRODUCTID', 'GLASSID','EVACHAMBER', 'EVENTTIME',\
+                  'BOFFSET','AOFFSET', 'COUNT', 'MAX', 'MIN']]
+            
+            if 'alarm' not in conn.list_table():
+                conn.creat_table_from_df(tablename='alarm', df=messgae)
+            conn.insert_df(tablename='alarm',df=messgae)
+            
+            if emailflag:
+                content='报警时间 %s \n\n报警详细信息\n\n'%(now)
+                content+= ' , '.join(messgae.columns)+"\n"
+                for i in messgae.index:
+                    content+=' , '.join(messgae.loc[i,:])+" \n"
+       
+                m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
+                     title = 'offset调整过大',
+                     content = content,
+                     ssl=True)
+                msg = m.send_mail()
+                print (msg)
+        except Exception as e:
+            print(e)
+            return alarmflag,df
+        
+    return alarmflag,df
