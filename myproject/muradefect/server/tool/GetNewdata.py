@@ -182,7 +182,8 @@ def DataCollect(starttime,endtime,conn):
 def CycleJudge(df,conn):
     ## df 是本周期 获取的数据
     groupid = pd.read_sql_query("select max(groupid) from eva_all",conn)['max'].iloc[0]
-    cycleid = pd.read_sql_query("select max(cycleid) from eva_all",conn)['max'].iloc[0]
+    cycleid = pd.read_sql_query("select max(cycleid) from eva_all \
+                                where groupid=%d"%(groupid),conn)['max'].iloc[0]
     
     ###############
     TimeNew=df.eventtime.min()
@@ -426,7 +427,7 @@ def AlarmPpa(df,init,exclude=[],conn=None):
         res = g[['ppa_x','ppa_y']].apply(lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)
         res = res/len(g)*100
         return res.round(3)
-    
+    temp1=pd.DataFrame([])
     for product in rate['product']:
         temp = pd.Series(rate['product'][product]).to_frame()
         temp = temp.astype(float)
@@ -434,12 +435,14 @@ def AlarmPpa(df,init,exclude=[],conn=None):
         temp['type'] = "ppa_"+temp.index.str[0]+"_th"
         temp['eva_chamber'] = "OC_"+temp.index.str[1:].str.replace("oc","")
         temp["product_id"] = product
-        temp1 = temp.pivot_table(index = ['product_id','eva_chamber'],columns =\
+        temp = temp.pivot_table(index = ['product_id','eva_chamber'],columns =\
               'type',values = 'value',aggfunc = 'max').reset_index()
+        temp1=temp1.append(temp)
          
     res1 = df.groupby(['product_id','line','eva_chamber','port','mask_set','mask_id','glass_id','eventtime']).\
             apply(func1).reset_index()
     res1 = pd.merge(res1,temp1,on =['product_id','eva_chamber'])
+    print(res1[['ppa_x','ppa_y','product_id','eva_chamber']])
     temps = []
     for key in ['ppa_x','ppa_y']:
         temp = res1[res1[key]<=res1[key+"_th"]]

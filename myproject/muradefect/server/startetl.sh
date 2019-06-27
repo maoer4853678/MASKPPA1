@@ -1,2 +1,2 @@
 cd /root/ppa/muradefect/server/
-python main.py
+/root/anaconda3/bin/python main.py

@@ -35,8 +35,8 @@ def GetEmailList():
     path = os.path.join(CONFIGROOT,"email.csv")
     if os.path.exists(path):
         df = pd.read_csv(path,engine = 'python')
-        df = df.dropna(subset = ['邮箱'])
-        return df['邮箱'].tolist()
+        df = df.dropna(subset = [df.columns[1]])
+        return df[df.columns[1]].tolist()
     else:
         return []
 
@@ -145,10 +145,9 @@ def Main(logger):
     logger.info('#########################   读取配置文件    #########################')
     init = GetOption()
     starttime = init['base']['starttime']
-    endtime = init['base']['endtime']
-    
-    endtime=pd.to_datetime(starttime)+pd.to_timedelta(1,unit='h')
-    endtime=str(endtime)
+    endtime = init['base']['endtime']    
+#    endtime=pd.to_datetime(starttime)+pd.to_timedelta(1,unit='h')
+#    endtime=str(endtime)
     
     running = init['base']['running']
     logger.info('本次获取时间范围 ： %s -- %s'%(starttime,endtime))
@@ -303,21 +302,24 @@ def Main(logger):
       
     logger.info('#########################   OFFSET优化阶段   #########################')   
     ###  首先 对每个 Glass 各个 ppa teg 进行mean 合并
+    print('df2.columns:',df2.columns)
     df3=df2.groupby(['product_id', 'groupid' ,'line','eva_chamber','port',"cycleid",'x_label', 'y_label',\
                     "glass_id"])[['ppa_x','ppa_y','pos_x','pos_y',\
                   'offset_x','offset_y','offset_tht']].mean().reset_index()
+    print('df3.columns-1:',df3.columns)
     ##  再次，针对同一个cycle 下所有glass 进行合并
     df3=df3.groupby(['product_id',"groupid", 'line','eva_chamber','port',"cycleid",'x_label', 'y_label'])\
             [['ppa_x','ppa_y','pos_x','pos_y','offset_x','offset_y','offset_tht']]\
             .mean().reset_index()
     ## df3 仅是用于计算的 数据源
     st = time.time()
-    
+    print('df3.columns-2:',df3.columns)
     res=df3.groupby(['product_id', 'groupid','line','eva_chamber','port','cycleid']).apply(cal_optimized_offset,init['ops'])
+    print('res.columns-1:',res.columns)
     res = pd.merge(res.reset_index(),df2[['product_id', "groupid",'line','eva_chamber','port','cycleid',\
                    "mask_id","mask_set",'glasscount', 'starttime', 'endtime']].drop_duplicates(),\
                    on = ['product_id', "groupid",'line','eva_chamber','port','cycleid']) 
-    
+    print('res.columns-2:',res.columns)
     logger.info('#########################   OFFSET优化结果异常判断阶段   #########################')   
     conn2 =Mysql(**init['datebase2'])
     flag1,res = AlarmOffset(res,init['alarm'],exclude=[],conn=conn2)
@@ -332,6 +334,11 @@ def Main(logger):
     res.glasscount=res.glasscount.astype(int)
     
     res.columns = res.columns.str.replace(".",'')
+    try:
+        del res['key']
+    except:
+        pass
+        
     conn2 =Mysql(**init['datebase2'])
     if "offset_table" not in conn2.list_table():
         conn2.creat_table_from_df("offset_table",res)
@@ -364,9 +371,9 @@ if __name__=="__main__":
     logger.addHandler(handler)
     logger.addHandler(console)   
     
-    for i in range(204):
-        try:
-            Main(logger)
-        except Exception as e:
-            logger.info("**** 程序出现异常 异常代码 : %s"%e)
+#    for i in range(5):
+    try:
+        Main(logger)
+    except Exception as e:
+        logger.info("**** 程序出现异常 异常代码 : %s"%e)
     
