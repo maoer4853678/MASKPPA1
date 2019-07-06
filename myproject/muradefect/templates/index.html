@@ -91,6 +91,13 @@
                     <div id="chart6" style="width: 500px;height:300px;"></div>
                     </div>
                 </div>
+
+                <div class="row">
+                    <div class="breadcrumb">
+                    <div id="chart7" style="width: 1565px;height:500px;"></div>
+                    </div>
+                </div>
+
   </div>
 
 <script type="text/javascript">
@@ -267,6 +274,7 @@ function doHandleMonth(month){
 <script type="text/javascript">
 // 基于准备好的dom，初始化echarts实例
 var alldata = {{data|safe}}
+var maxdata = {{maxdata|safe}}
 var option = {
 title: {
     text: ''
@@ -364,6 +372,14 @@ for (var i = 0; i < charts.length; i++) {
      }
     myChart.setOption(option);        
 }
+
+var myChart = echarts.init(document.getElementById("chart7"));
+option.title.text = '膜层Max(PPA)占比图'
+option.xAxis.data = maxdata.glass_id
+option.series[0].data = maxdata.ppa_x
+option.series[1].data= maxdata.ppa_y
+myChart.setOption(option);
+
 }
 
 FreshData()
@@ -396,7 +412,8 @@ $.ajax({
                 alertify.error("未发现符合条件数据 ")
             }
             else {
-                alldata = data
+                alldata = data.all
+                maxdata = data.max
                 FreshData()
             }
     }

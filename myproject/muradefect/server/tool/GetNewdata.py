@@ -50,20 +50,13 @@ def Pmaskid(Glass_ID,conn):
     print (p4.columns)
     if not len(p4) or "sub_id" not in p4.columns.tolist():
         return pd.DataFrame([],columns = ['product_id','glass_id','eva_chamber'])
-    
-    print (p4[['glass_id','sub_id']].head())
-    
-    p4 = p4[p4.glass_id == p4.sub_id].drop(['sub_id'], axis=1)
-    
+    print (p4[['glass_id','sub_id']].head())    
+    p4 = p4[p4.glass_id == p4.sub_id].drop(['sub_id'], axis=1)    
     print ("p4.shape",p4.shape)
-    p4['mask_set'] = p4.mask_id.str[-4:]
-    
+    p4['mask_set'] = p4.mask_id.str[-4:]    
     print('p4.subunitname',p4.subunitname)
     p4['eva_chamber'] = 'OC_'+p4.subunitname.str[-2]
-    
-    
-    
-    p4['line'] = p4.subunitname.str[-1]    
+    p4['line'] = p4.subunitname.str[-1].astype(int)  
     ####若line=2，port的A,B改成C,D
     p4.loc[p4[(p4.line==2)&(p4.port=='A')].index,'port']='C'
     p4.loc[p4[(p4.line==2)&(p4.port=='B')].index,'port']='D'
@@ -189,43 +182,56 @@ def CycleJudge(df,conn):
     TimeNew=df.eventtime.min()
     TimeOld=pd.read_sql_query("select max(eventtime) from eva_all",conn)['max'].iloc[0]
     
-    if (pd.to_datetime(TimeNew)-pd.to_datetime(TimeOld))>pd.to_timedelta(36,unit='h'):
+    if (pd.to_datetime(TimeNew)-pd.to_datetime(TimeOld))>pd.to_timedelta(22,unit='h'):
         datachoose = [groupid,cycleid]
         datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
         groupid+=1
         cycleid=0
         df['groupid']=groupid
-        df['cycleid']=cycleid
+        df['cycleid']=cycleid   
     else:
-        data = pd.read_sql_query("select distinct cycleid,port,mask_id,eventtime \
-                from eva_all where cycleid = %d and eva_chamber ='OC_8' "%cycleid,conn)
-        data = data.sort_values("eventtime").drop_duplicates("port",keep='last').\
-        drop("eventtime",axis=1)
+        data = pd.read_sql_query('''
+                select distinct cycleid,eva_chamber,port,mask_id,eventtime
+                from eva_all where groupid =%d and cycleid = %d'''%(groupid,cycleid),conn)
+
+        data = data.sort_values("eventtime").drop_duplicates(['eva_chamber','port'],keep='last').\
+                drop("eventtime",axis=1)
+        data.rename(columns={'mask_id':'mask_id_old'},inplace=True)
+        
         cycleids = {}
         for glass_id in df.glass_id.unique():
-            cycleids[glass_id] = cycleid
-            temp = df[df.glass_id==glass_id][['port','mask_id']].drop_duplicates()
-            ## 首先判断 port 在不在，不在的话，暂时无法判别其 cycleid，默认 为原cycleid
-            if temp.port.iloc[0] in data["port"].tolist():
-                temp1 = pd.merge(temp,data,on = ['port','mask_id'])
-                if len(temp1)==0:
-                    cycleids[glass_id] = cycleids[glass_id]+1        
-        ## cycleids 初次甄别完成
-        df1 = df[df.eva_chamber=='OC_8'][['glass_id','eventtime']].drop_duplicates().sort_values("eventtime")  
+            cycleids[glass_id] = cycleid  #默认cycle不变
+            '''
+            temp中，按照glassid取出所有chamber，随后选出最大的
+            '''
+            temp = df[df.glass_id==glass_id][['eva_chamber','port','mask_id']].drop_duplicates() #针对每片Glass，一一判断cycle   
+            temp=temp[temp.eva_chamber==temp.eva_chamber.max()]
+            temp.rename(columns={'mask_id':'mask_id_new'},inplace=True)
+            '''
+            1、新旧均rename一下mask_id;
+            2、首先判断新数据里[chamber, port] 在不在旧数据中，不在的话，暂时无法判别其 cycleid，默认为原cycleid
+            具体体现就是：merge(on=[chamber, port])后，若为空，则保持原cycle
+            3、若不为空，则判断maskid是否相同。            
+            '''                
+            temp1 = pd.merge(temp,data,on = ['port','eva_chamber']) 
+            temp1['judge']=(temp1.mask_id_old!=temp1.mask_id_new) #因为指定了glassID，因此len(temp1)只有可能等于0或1
+            if (temp1.judge.max()==True): #temp1.judge.max()可能存在3种情况：True，False，nan
+                cycleids[glass_id] = cycleids[glass_id]+1
+            
+        #df1 = df[df.eva_chamber=='OC_8'][['glass_id','eventtime']].drop_duplicates().sort_values("eventtime")  
+        df1=df.sort_values("eventtime").drop_duplicates(['glass_id'],keep='last')            
         df1['cycleid'] = df1['glass_id'].map(cycleids)
-    
-        ## 对 新数据的 cycleid 做二次甄别，若按照eventtime排序后 cycleid 不能小于前面
-        ## 进行迭代修复，直到所有的 cycleid 都>=前面
         for i in range(len(df1)):
             df1['temp'] = df1["cycleid"].diff()
             if len(df1[df1['temp']<0])==0:
                 break
             df1.loc[df1[df1.temp<0].index,'cycleid'] = np.nan
-            df1["cycleid"]= df1["cycleid"].fillna(method = "ffill")
+            df1["cycleid"]= df1["cycleid"].fillna(method = "ffill")            
+        cycleids = dict(zip(df1['glass_id'],df1["cycleid"]))         
         
-        cycleids = dict(zip(df1['glass_id'],df1["cycleid"]))
-        df['cycleid'] = df["glass_id"].map(cycleids)
         df['groupid']=groupid
+        df['cycleid'] = df["glass_id"].map(cycleids)
+        df=df.sort_values('eventtime')           
         if df['cycleid'].max()!= cycleid:
             datachoose = [groupid,cycleid]
             datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
@@ -266,48 +272,49 @@ def GetCalPPA(datachoose,conn,number = 3):
     glasscount=len(data1.glass_id.unique())
     
     #############
-    Njudge1=data1[['mask_id','glass_id']].drop_duplicates()
-    NGlass=Njudge1.groupby('mask_id').count()    
-    MaskInCom=NGlass[NGlass.glass_id<number].index.tolist()
-    Add=0
-    if len(MaskInCom):
+    Njudge1=data1[['mask_id','glass_id','port']].drop_duplicates()
+    NGlass=Njudge1.groupby(['mask_id','port']).count()
+    MaskInCom=NGlass[NGlass.glass_id<number].index.tolist()    
+    #如果不足3片，则后续补足3片的时候，必须从相同maskid+相同port中选择Glass去补
+    for mask,port in MaskInCom:
+        if not len(MaskInCom):
+            continue
         sql00 = '''
-              select distinct glass_id,eventtime from eva_all where mask_id in (%s)
-                  order by eventtime desc limit 3
-            ''' %(str(MaskInCom)[1:-1])
+              select distinct glass_id,eventtime from eva_all 
+              where mask_id ='%s' and port = '%s'
+                  order by eventtime desc limit %d
+            ''' %(mask,port,number)
+            
         d0=pd.read_sql_query(sql00,conn)
         GlassAdd=d0.glass_id.tolist()
         if GlassAdd:
             sql2 = '''
                   select * from eva_all 
                   where glass_id in (%s)
-                  and mask_id in (%s)                
-                ''' %(str(GlassAdd)[1:-1],str(MaskInCom)[1:-1])
+                  and mask_id ='%s' and port = '%s'
+                ''' %(str(GlassAdd)[1:-1],mask,port)
             data2=pd.read_sql_query(sql2,conn)
-            Add=1
-    if Add==0:
-        data=data1
-    else:
-        data=data1.append(data2).drop_duplicates()
+            data1=data1.append(data2).drop_duplicates()
     
-    data['glasscount']=glasscount
-    data['starttime']=starttime
-    data['endtime']=endtime
-    return data
+    data1['glasscount']=glasscount
+    data1['starttime']=starttime
+    data1['endtime']=endtime
+    data1['cycleid']=cycleid
+    data1.sort_values('eventtime',inplace=True)
+    data1.index=range(len(data1))
+    return data1
 
 def CreateOffsetAfter(g):
-    '''
-    1、deltaX,Y的顺序可能需要做调整
-    2、考虑到通用性，建议返回值不删除这几个delta
-    '''
-    g1 =g[['glass_id','offset_x','offset_y','offset_tht']].drop_duplicates().set_index("glass_id")
-    t1 = (g1-g1.loc[g1.index[-1]]).reset_index()
-    t1 =t1.rename(dict(zip(['offset_x','offset_y','offset_tht'],['deltax','deltay','deltat'])),axis=1)
+    g1 =g[['eventtime','glass_id','offset_x','offset_y','offset_tht']].sort_values('eventtime').\
+            drop_duplicates().set_index("glass_id")
+    t1 = (g1.loc[g1.index[-1]]-g1).reset_index().drop('eventtime',axis=1).apply(pd.to_numeric,errors='ignore')
+    t1.offset_tht=(-1)*t1.offset_tht
+    t1 =t1.rename(dict(zip(['offset_x','offset_y','offset_tht'],['delta_y','delta_x','delta_t'])),axis=1)
     t2 = pd.merge(g,t1,on = ['glass_id'])
-    t2['ppa_x'] = t2['ppa_x']+t2['deltay']-t2['deltat']*t2['pos_y'] * np.pi / 180 / 100
-    t2['ppa_y'] = t2['ppa_y']+t2['deltax']+t2['deltat']*t2['pos_x'] * np.pi / 180 / 100
-        
-    return t2.drop(['deltax','deltay','deltat'],axis=1)
+    t2['ppa_x'] = t2['ppa_x']+t2['delta_x']-t2['delta_t']*t2['pos_y'] * np.pi / 180 / 100
+    t2['ppa_y'] = t2['ppa_y']+t2['delta_y']+t2['delta_t']*t2['pos_x'] * np.pi / 180 / 100
+    
+    return t2.drop(['delta_x','delta_y','delta_t'],axis=1)
     
 def ResetValue(df):
     df = df.sort_values(['glass_id','eva_chamber','pos_x','pos_y'])
@@ -359,196 +366,3 @@ def ResetValue(df):
     else:
         return df1
     
-def AlarmPpa(df,init,exclude=[],conn=None):
-    ## 原始数据报警程序
-    alarmflag = False ## 异常值报警标识
-    threshold = init['threshold']
-    email = init['email']
-    emailflag =  email['flag']==1 and len(email['list'])!=0
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    rate = init['rate']
-    
-    columns = list((set(threshold.keys()) - set(exclude)).intersection(set(df.columns)))
-    def func(g):
-        rr = g[columns]
-        rr.index = range(len(rr))
-        res = rr.apply(lambda x:x[x.abs()>threshold[x.name]].\
-          describe().loc[['count','max','min']],axis=0).T.reset_index()\
-               .rename(columns ={"index":"key"})
-        return res
-    
-    res = df.groupby(['product_id','line','eva_chamber','mask_id','glass_id','eventtime']).\
-            apply(func).reset_index()
-    res = res[res['count']>0]
-    
-    if len(res):  ### 异常值触发 报警
-        print('PPA_X/Y 超限')
-        alarmflag = True
-        res = res.drop("level_6",axis=1)
-        res['line'] = res['line'].astype(int)
-        print(res)
-        df = pd.merge(df,res[['product_id','line','eva_chamber','mask_id','glass_id','eventtime','count']].\
-          drop_duplicates(),on = ['product_id','line','eva_chamber','mask_id','glass_id','eventtime'],how = "left")
-        error = df[~df['count'].isnull()]
-        df = df[df['count'].isnull()].drop("count",axis=1)  ##  那剔除某 PPA异常的数据，其他照常计算 
-        
-        messgae = error[['glass_id','mask_id','eva_chamber',\
-                     'eventtime','offset_x', 'offset_y', 'offset_tht']].drop_duplicates()
-        messgae['boffset'] =messgae[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
-                    .apply(lambda x:','.join(x),axis=1)
-        messgae = pd.merge(res,messgae,on = ['glass_id','mask_id','eva_chamber','eventtime'])
-        messgae.columns =messgae.columns.str.replace("_",'').str.upper()
-        messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
-        messgae['AOFFSET'] = ''
-        messgae = messgae[['PRODUCTID','GLASSID','MASKID','EVACHAMBER','EVENTTIME',\
-               'BOFFSET','AOFFSET','COUNT','MAX', 'MIN']]
-        print('PPA messgae',messgae)
-        if 'alarm' not in conn.list_table():
-            conn.creat_table_from_df(tablename='alarm', df=messgae)
-        conn.insert_df(tablename='alarm',df=messgae)
-
-        ### 触发邮箱报警, 并且已经过滤掉了 df中的异常数据
-        
-        if (len(messgae))&emailflag:
-            content='报警时间 %s \n\n报警详细信息\n\n'%(now)
-            content+= ' , '.join(messgae.columns)+"\n"
-            for i in messgae.index:
-                content+=' , '.join(messgae.loc[i,:])+" \n"
-   
-            m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
-                 title = 'PPA单点超限异常',
-                 content = content,
-                 ssl=True)
-            msg = m.send_mail()
-            print (msg)
-
-    ths = {"ppa_x":rate['th'][0],"ppa_y":rate['th'][1]}
-    def func1(g):
-        res = g[['ppa_x','ppa_y']].apply(lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)
-        res = res/len(g)*100
-        return res.round(3)
-    temp1=pd.DataFrame([])
-    for product in rate['product']:
-        temp = pd.Series(rate['product'][product]).to_frame()
-        temp = temp.astype(float)
-        temp.columns = ['value']
-        temp['type'] = "ppa_"+temp.index.str[0]+"_th"
-        temp['eva_chamber'] = "OC_"+temp.index.str[1:].str.replace("oc","")
-        temp["product_id"] = product
-        temp = temp.pivot_table(index = ['product_id','eva_chamber'],columns =\
-              'type',values = 'value',aggfunc = 'max').reset_index()
-        temp1=temp1.append(temp)
-         
-    res1 = df.groupby(['product_id','line','eva_chamber','port','mask_set','mask_id','glass_id','eventtime']).\
-            apply(func1).reset_index()
-    res1 = pd.merge(res1,temp1,on =['product_id','eva_chamber'])
-    print(res1[['ppa_x','ppa_y','product_id','eva_chamber']])
-    temps = []
-    for key in ['ppa_x','ppa_y']:
-        temp = res1[res1[key]<=res1[key+"_th"]]
-        temp = temp[['product_id','glass_id','mask_id','eva_chamber',key,key+"_th"]]
-        temp = temp.rename(columns ={key:"value",key+"_th":"threshold"})
-        temp['field'] = key.upper()
-        temps.append(temp)
-    messgae = pd.concat(temps)
-        
-    if len(messgae):
-        alarmflag = True        
-        print('messgae',messgae)
-        messgae = pd.merge(df[['product_id', 'glass_id', 'mask_id', 'eva_chamber','eventtime',\
-          'offset_x','offset_y', 'offset_tht']].drop_duplicates(),messgae,\
-                on = ['product_id', 'glass_id', 'mask_id', 'eva_chamber'])
-        messgae['boffset'] =messgae[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
-                        .apply(lambda x:','.join(x),axis=1)
-        messgae.columns =messgae.columns.str.replace("_",'').str.upper()
-        messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
-#        messgae = messgae[["PRODUCTID",'GLASSID','MASKID','EVACHAMBER','EVENTTIME',\
-#                   'BOFFSET','FIELD','VALUE', 'THRESHOLD']]
-        if len(messgae):            
-            if 'alarmrate' not in conn.list_table():
-                conn.creat_table_from_df(tablename='alarmrate', df=messgae)
-                
-            conn.insert_df(tablename='alarmrate',df=messgae)
-            
-            if emailflag:
-                content='报警时间 %s \n\n报警详细信息\n\n'%(now)
-                content+= ' , '.join(messgae.columns)+"\n"
-                for i in messgae.index:
-                    content+=' , '.join(messgae.loc[i,:])+" \n"
-       
-                m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
-                     title = 'PPA占比超SPEC',
-                     content = content,
-                     ssl=True)
-                msg = m.send_mail()
-                print (msg)
-            
-    return alarmflag,df
-
-
-def AlarmOffset(df,init,exclude=[],conn=None):
-    ## 原始数据报警程序
-    alarmflag = False ## 异常值报警标识
-    threshold = init['threshold']
-    email = init['email']
-    emailflag =  email['flag']==1 and len(email['list'])!=0
-    now = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
-    columns = list((set(threshold.keys()) - set(exclude)).intersection(set(df.columns)))
-    def func(g):
-        rr = g[columns]
-        rr.index = range(len(rr))
-        res = rr.apply(lambda x:x[x.abs()>threshold[x.name]].\
-          describe().loc[['count','max','min']],axis=0).T.reset_index()\
-               .rename(columns ={"index":"key"})
-        return res
-    cols = ['product_id','port','eva_chamber','groupid','cycleid']
-    res = df.groupby(cols).\
-            apply(func).reset_index()
-    res = res[res['count']>0]
-    
-    if len(res):  ### 异常值触发 报警
-        alarmflag = True 
-        res = res.drop("level_%d"%(len(cols)),axis=1)
-        df = pd.merge(df,res.drop_duplicates(),on = cols,how = "left")
-        error = df[~df['count'].isnull()]
-        df = df[df['count'].isnull()].drop(["count",'min','max'],axis=1)  ##  那剔除某 OFFSET 调整异常的数据
-        try:
-            error['boffset'] =error[['offset_x', 'offset_y', 'offset_tht']].astype(str)\
-                            .apply(lambda x:','.join(x),axis=1)
-            error['aoffset'] =error[['after_x', 'after_y', 'after_t']].astype(str)\
-                            .apply(lambda x:','.join(x),axis=1)  
-            conditon = ' and '.join(map(lambda x:" %s in (%%s)"%x,cols))
-            sql = "select distinct glass_id,mask_id,eventtime,%s from eva_all where %s"%(','.join(cols),conditon)
-            args = tuple(map(lambda x:str(error[x].tolist())[1:-1],cols))
-            temp = pd.DataFrame(conn.exec_(sql%(args)),columns =["glass_id",'mask_id','eventtime']+cols)
-            messgae = pd.merge(error,temp,on =cols)    
-            messgae.columns =messgae.columns.str.replace("_",'').str.upper()
-            messgae = messgae.rename(columns ={"EVA_CHARMBER":"CHARMBER"}).astype(str)
-            print('message,offset:')
-            print(messgae.columns)
-            print(messgae.shape)
-            messgae = messgae[['PRODUCTID', 'GLASSID','EVACHAMBER', 'EVENTTIME',\
-                  'BOFFSET','AOFFSET', 'COUNT', 'MAX', 'MIN']]
-            
-            if 'alarm' not in conn.list_table():
-                conn.creat_table_from_df(tablename='alarm', df=messgae)
-            conn.insert_df(tablename='alarm',df=messgae)
-            
-            if emailflag:
-                content='报警时间 %s \n\n报警详细信息\n\n'%(now)
-                content+= ' , '.join(messgae.columns)+"\n"
-                for i in messgae.index:
-                    content+=' , '.join(messgae.loc[i,:])+" \n"
-       
-                m = SendMail(username='edong_2019@163.com',passwd='v123456789', recv=email['list'],
-                     title = 'offset调整过大',
-                     content = content,
-                     ssl=True)
-                msg = m.send_mail()
-                print (msg)
-        except Exception as e:
-            print(e)
-            return alarmflag,df
-        
-    return alarmflag,df

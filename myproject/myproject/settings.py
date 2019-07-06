@@ -74,29 +74,29 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/2.2/ref/settings/#databases
 
-# DATABASES = {
-#     'default': {
-#          'ENGINE': 'django.db.backends.postgresql',
-#          'NAME': 'ppa',
-#          'USER': 'k2data',
-#          'PASSWORD': 'K2data1234',
-#          'HOST': '10.68.2.182',
-#          'PORT': '30012',
-#          #'CONN_MAX_AGE': 5,
-#      }
-# }
-    
 DATABASES = {
-   'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'ppa',
-        'USER': 'root',
-        'PASSWORD': 'root',
-        'HOST': '127.0.0.1',
-        'PORT': '5432',
-        #'CONN_MAX_AGE': 5,
-    }
+    'default': {
+         'ENGINE': 'django.db.backends.postgresql',
+         'NAME': 'ppa',
+         'USER': 'k2data',
+         'PASSWORD': 'K2data1234',
+         'HOST': '10.68.2.182',
+         'PORT': '30012',
+         #'CONN_MAX_AGE': 5,
+     }
 }
+    
+#DATABASES = {
+#    'default': {
+#         'ENGINE': 'django.db.backends.postgresql',
+#         'NAME': 'ppa',
+#         'USER': 'root',
+#         'PASSWORD': 'root',
+#         'HOST': '127.0.0.1',
+#         'PORT': '5432',
+         #'CONN_MAX_AGE': 5,
+#     }
+#}
 
 
 #DATABASES = {

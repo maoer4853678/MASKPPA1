@@ -62,13 +62,13 @@ def GetOffsetSta():
         select distinct product_id as productid,groupid,line,eva_chamber as chamber,\
          port,cycleid,starttime,endtime,glasscount as count from offset_table  \
           where starttime >='%s' and starttime <= '%s' order by starttime desc\
-         '''%(starttime.strftime("%Y-%m-%d"),endtime.strftime("%Y-%m-%d"))
+         '''%(starttime.strftime("%Y-%m-%d %H:%M:%S"),endtime.strftime("%Y-%m-%d %H:%M:%S"))
         data = pd.read_sql_query(sql,con=conn.obj.conn)
         data['count'] = data['count'].astype(int)
         data['starttime'] = pd.to_datetime(data['starttime'])
         data['endtime'] = pd.to_datetime(data['endtime'])
         res =  data.groupby(['productid','groupid','line','cycleid']).\
-            agg({"starttime":"min","endtime":"max","count":"mean"}).reset_index()
+            agg({"starttime":"min","endtime":"max","count":"max"}).reset_index()
         res = res.sort_values(["starttime",'productid','groupid','line','cycleid'],\
                ascending=False)
         res.columns =res.columns.str.upper()
@@ -77,11 +77,12 @@ def GetOffsetSta():
         return pd.DataFrame(),pd.DataFrame()
 
 def GetPpaData(starttime,endtime,product,maskids):
-    data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id from eva_all \
+    data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id,x_label,y_label from eva_all \
                              where eventtime >='%s' and eventtime <= '%s' \
                              and product_id = '%s' and mask_id in (%s) \
                              "%(starttime,endtime,\
                              product,str(maskids)[1:-1]),con=conn.obj.conn)
+
     init =  GetSP()
     xth = max(init['xth'].values())
     yth = max(init['xth'].values())
@@ -93,7 +94,13 @@ def GetPpaData(starttime,endtime,product,maskids):
                     (lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)/len(y)*100).round(2)
         res.append({"mask_id":mask_id,"glass_id":res1.index.tolist(),\
                     "ppa_x":res1['ppa_x'].tolist(),"ppa_y":res1['ppa_y'].tolist()})
-    return res
+    data[['ppa_x','ppa_y']] = data[['ppa_x','ppa_y']].abs()
+    ## 取MAX膜层的 PPA数据 做占比分析
+    temp = data.groupby(['glass_id','x_label','y_label'])['ppa_x','ppa_y'].max().reset_index()
+    res3 = temp.groupby("glass_id").apply(lambda y:y[['ppa_x','ppa_y']].apply\
+                    (lambda x:len(x[x.abs()<=ths[x.name]]),axis=0)/len(y)*100).round(2)
+    res4 = {"glass_id":res1.index.tolist(),"ppa_x":res3['ppa_x'].tolist(),"ppa_y":res3['ppa_y'].tolist()}
+    return res,res4
 
 
 def GenerateTable(df):
@@ -305,9 +312,9 @@ def GetPpa(request):
         maskids = list(map(lambda x:x.strip(),maskids))
         print ("请求参数 starttime: %s, endtime: %s\n product :%s , maskset :%s"\
                %(starttime,endtime,product,maskids))
-        res = GetPpaData(starttime,endtime,product,maskids)
+        res,res1 = GetPpaData(starttime,endtime,product,maskids)
         print ("查询结果长度 %d"%(len(res)))
-        return HttpResponse(json.dumps(res),content_type="application/json,charset=utf-8")
+        return HttpResponse(json.dumps({"all":res,"max":res1}),content_type="application/json,charset=utf-8")
 
 @need_logged_in
 def GetOffset(request):
@@ -319,7 +326,7 @@ def GetOffset(request):
     sql = '''
     select product_id as productid,groupid,line,eva_chamber as chamber,\
          port,cycleid,mask_id as maskid,starttime,endtime, delta_x,delta_y, delta_t as delta_tht,\
-         offset_x, offset_y, offset_tht from offset_table  \
+         after_x, after_y, after_t as after_tht from offset_table  \
          where groupid =%s and cycleid = %s and PRODUCT_ID = '%s' and line = %s
     '''%(groupid,cycleid,product,line)
     try:
@@ -438,7 +445,7 @@ def index(request):
         for diff in diffs:
             CreateRateTh(diff)
 #        res = GetPpaData(starttime,endtime,products[0],masksets[0])
-        return render(request, 'index.html', {'username': username,"data":'[]',\
+        return render(request, 'index.html', {'username': username,"data":'[]',"maxdata":'{}',\
                 "productdict":productdict,"masksetdict":masksetdict})
     else:
         return redirect('/login')
@@ -471,6 +478,8 @@ def Alarm(request):
     username=  request.session.get("username")
     try:
         df = pd.read_sql_query("select * from alarm ORDER BY EVENTTIME DESC limit 20 ",con = conn.obj.conn)
+        df.loc[df[df.glassid.str.len()>12].index,'glassid'] = \
+            df.loc[df[df.glassid.str.len()>12].index,'glassid'].str.slice(0,14)+"..."
         df.columns = df.columns.str.upper()
         data,fields = GenerateTable(df)
     except:

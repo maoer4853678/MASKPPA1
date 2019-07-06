@@ -18,7 +18,10 @@ import time
 import datetime
 import numpy as np
 import pandas as pd
+import json
+from tool.Alarm import *
 
+IMAGE = './image'
 CONFIGROOT= '../static/conf'
 LOGGING = './log'
 
@@ -52,9 +55,15 @@ def GetOption():
     base_args['endtime'] =end_time.strftime('%Y-%m-%d %H:%M:%S')
     base_args['running'] =  config.get("base","running")
     #time_args['endtime'] ='2019-06-19 06:00:00'
-    ops_args = {}
-    ops_args['th1'] =min(float(config.get("xth","xth1")),float(config.get("yth","yth1")))
-    ops_args['th2'] =min(float(config.get("xth","xth2")),float(config.get("yth","yth2")))
+    ops_args = {}    
+    ops_args['xth1'] =float(config.get("xth","xth1"))
+    ops_args['xth2'] =float(config.get("xth","xth2"))
+    ops_args['xweight1'] =float(config.get("xth","xweight1"))
+    ops_args['xweight2'] =float(config.get("xth","xweight2")) 
+    ops_args['yth1'] =float(config.get("yth","yth1"))
+    ops_args['yth2'] =float(config.get("yth","yth2"))
+    ops_args['yweight1'] =float(config.get("yth","yweight1"))
+    ops_args['yweight2'] =float(config.get("yth","yweight2"))
     
     cols = ['ppa_x','ppa_y','delta_x','delta_y','delta_t']
     alarm_args = {}
@@ -117,17 +126,19 @@ def InsertCIM(df,init1):
     now = datetime.datetime.now()
     df['timekey'] = pd.date_range(now,periods=len(df),freq="0.000001S")
     df['timekey'] = df['timekey'].astype(str).str.replace(":|-| |\.",'')
-    df['maskname'] = df["mask_id"]
-    df['chambername'] = df["eva_chamber"]
-    df['linetype'] = df["line"]
-    df['evaoffsetx'] = df["offset_x"]
-    df['evaoffsety'] = df["offset_y"]
-    df['evaoffsettheta'] = df["offset_tht"]
+    df['maskname'] = df["mask_id"]    
+    DD={'OC_3':'EV3','OC_4':'EV3','OC_5':'EV4','OC_6':'EV4','OC_7':'EV5','OC_8':'EV5'}
+    df['chambername'] = '2CEE01-'+df.eva_chamber.map(DD)+'-'+\
+            df.eva_chamber.str.replace('C_','')+df.line.astype(str)
+    df['linetype'] = df.port.str.replace('C','A').replace('D','B')
+    df['evaoffsetx'] = df["after_x"]
+    df['evaoffsety'] = df["after_y"]
+    df['evaoffsettheta'] = df["after_t"]
     df['ifflag'] = 'N'
     df = df.astype(str)
     cols = ["timekey","maskname","chambername","linetype",\
             "evaoffsetx","evaoffsety","evaoffsettheta","ifflag"]
-    df = df[cols]
+    df = df[cols].sort_values(["timekey"])
     init1['engine'] = "o"
     conn3 = Mysql(**init1)
     conn3.insert_df("mes_bigdataif_maskoffset",df)
@@ -214,14 +225,13 @@ def Main(logger):
                  'offset_tht',
                  'groupid',
                  'cycleid'])
-            datachoose=pd.DataFrame([])
+            datachoose=pd.DataFrame([],columns=['groupid','cycleid'])
     else:
         logger.info('eva_all表不存在')
         data2=df
         data2['groupid']=0
         data2['cycleid']=0
-        datachoose=[]
-        conn2.creat_table_from_df(tablename='eva_all', df=data2)
+        datachoose=pd.DataFrame([],columns=['groupid','cycleid'])
     conn2.close() 
     ## data2 是 本周期 完整的 EVA_ALL表
     logger.info('#########################   原始PPA数据异常判断阶段   #########################')   
@@ -234,8 +244,12 @@ def Main(logger):
 #    '''
     #### 针对原始PPA 进行异常值报警
     conn2 =Mysql(**init['datebase2'])
+    data2=data2.groupby(['product_id','eventtime','groupid' ,'line','eva_chamber','mask_id',\
+                 'mask_set','port',"cycleid",'x_label', 'y_label',\
+                    "glass_id"])[['ppa_x','ppa_y','pos_x','pos_y',\
+                  'offset_x','offset_y','offset_tht']].mean().reset_index()
     print("data2.shape before alarm",data2.shape)
-    flag,data2 = AlarmPpa(data2,init = init['alarm'],exclude = [] ,conn=conn2)
+    flag,data2 = AlarmPpa(data2,init = init['alarm'],ops = init['ops'],exclude = [] ,conn=conn2)
     print("data2.shape after alarm",data2.shape)
     conn2.close() 
     if flag:
@@ -256,7 +270,8 @@ def Main(logger):
     data2.line=data2.line.astype(int)
     data2.x_label=data2.x_label.astype(int)
     data2.y_label=data2.y_label.astype(int)    
-    
+    if 'eva_all' not in conn2.list_table():
+        conn2.creat_table_from_df(tablename='eva_all', df=data2)
     conn2.insert_df(tablename='eva_all',df=data2)
     logger.info('已完成初始数据插入，耗时 :  %0.2fs'%(time.time()-st))
     '''
@@ -303,12 +318,14 @@ def Main(logger):
     logger.info('#########################   OFFSET优化阶段   #########################')   
     ###  首先 对每个 Glass 各个 ppa teg 进行mean 合并
     print('df2.columns:',df2.columns)
-    df3=df2.groupby(['product_id', 'groupid' ,'line','eva_chamber','port',"cycleid",'x_label', 'y_label',\
-                    "glass_id"])[['ppa_x','ppa_y','pos_x','pos_y',\
+    df3=df2.groupby(['product_id','groupid' ,'line','eva_chamber','mask_id',\
+                 'port',"cycleid",'x_label', 'y_label',"glass_id"])\
+                    [['ppa_x','ppa_y','pos_x','pos_y',\
                   'offset_x','offset_y','offset_tht']].mean().reset_index()
     print('df3.columns-1:',df3.columns)
+    df4=df3.copy()
     ##  再次，针对同一个cycle 下所有glass 进行合并
-    df3=df3.groupby(['product_id',"groupid", 'line','eva_chamber','port',"cycleid",'x_label', 'y_label'])\
+    df3=df3.groupby(['product_id',"groupid", 'line','eva_chamber','mask_id','port',"cycleid",'x_label', 'y_label'])\
             [['ppa_x','ppa_y','pos_x','pos_y','offset_x','offset_y','offset_tht']]\
             .mean().reset_index()
     ## df3 仅是用于计算的 数据源
@@ -322,7 +339,7 @@ def Main(logger):
     print('res.columns-2:',res.columns)
     logger.info('#########################   OFFSET优化结果异常判断阶段   #########################')   
     conn2 =Mysql(**init['datebase2'])
-    flag1,res = AlarmOffset(res,init['alarm'],exclude=[],conn=conn2)
+    flag1,res = AlarmOffset(res,df4,init['alarm'],ops = init['ops'],exclude=[],conn=conn2)
     conn2.close()
     if flag1:
         logger.info('OFFSET优化结果中发现异常！！！')
@@ -359,7 +376,7 @@ if __name__=="__main__":
     logger = logging.getLogger(__name__)
     logger.setLevel(level = logging.DEBUG)
     now = datetime.datetime.now().strftime("%Y%m%d%H")
-    CheckDirname([LOGGING])
+    CheckDirname([LOGGING,IMAGE])
     handler = logging.FileHandler(os.path.join(LOGGING,"%s.txt"%now))
     handler.setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')

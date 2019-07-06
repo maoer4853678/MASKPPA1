@@ -172,7 +172,7 @@ function FreshData(select){
        
        console.log(alldata[select],'alldata[select]')
        var thsdict = alldata[select]['thresholds'][item]  // {'th1':{upper,lower},'th2':{upper,lower},"thname":''}
-       var thcolors = {"th1":"red","th2":"green"}
+       var thcolors = {"th1":"green","th2":"red"}
        var thids = ["th1","th2"]
        for (var thid = 0; thid < thids.length; thid++) {
            var thname = thids[thid]

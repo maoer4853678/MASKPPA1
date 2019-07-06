@@ -4,9 +4,13 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import base64
 import time
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 class SendMail(object):
-    def __init__(self, username, passwd, recv, title, content,
+    def __init__(self, username, passwd, recv, title, content,images=[],
                  file=None, ssl=False,
                  email_host='smtp.163.com', port=25, ssl_port=465):
         '''
@@ -26,6 +30,7 @@ class SendMail(object):
         self.recv = recv  # 收件人，多个要传list ['a@qq.com','b@qq.com]
         self.title = title  # 邮件标题
         self.content = content  # 邮件正文
+        self.images = images
         self.file = file  # 附件路径，如果不在当前目录下，要写绝对路径
         self.email_host = email_host  # smtp服务器地址
         self.port = port  # 普通端口
@@ -50,6 +55,30 @@ class SendMail(object):
                 att["Content-Disposition"] = 'attachment; filename="%s"' % (new_file_name)
                 msg.attach(att)
         msg.attach(MIMEText(self.content))  # 邮件正文的内容
+        
+        if len(self.images):
+            for i,image in enumerate(self.images):
+                send_str = '<html><body>'
+                send_str += '<left>%s</left>'%(image['content'])
+                
+                # html中以<img>标签添加图片，align和width可以调整对齐方式及图片的宽度
+                send_str += '<img src="cid:%s" alt="%s" align="center" width=100%% >'%\
+                            ("image%d"%i,"image%d"%i)
+                            
+                send_str +='<HR style="border:2 dashed #987cb9" width="100%" color=#987cb9 SIZE=1>'
+                send_str += '</body></html>'
+          
+                # 添加邮件内容
+                content = MIMEText(send_str, _subtype='html', _charset='utf8')
+                msg.attach(content)
+                
+                try:
+                    img1 = MIMEImage(open(image['file'], 'rb').read(), _subtype='octet-stream')
+                    img1.add_header('Content-ID', "image%d"%i)
+                    msg.attach(img1)
+                except:
+                    pass
+
         msg['Subject'] = self.title  # 邮件主题
         msg['From'] = self.username  # 发送者账号
         msg['To'] = ','.join(self.recv)  # 接收者账号列表
