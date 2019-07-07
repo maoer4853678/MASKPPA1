@@ -281,9 +281,9 @@ def GetCalPPA(datachoose,conn,number = 3):
             continue
         sql00 = '''
               select distinct glass_id,eventtime from eva_all 
-              where mask_id ='%s' and port = '%s'
+              where mask_id ='%s' and port = '%s' and groupid=%d
                   order by eventtime desc limit %d
-            ''' %(mask,port,number)
+            ''' %(mask,port,groupid,number)
             
         d0=pd.read_sql_query(sql00,conn)
         GlassAdd=d0.glass_id.tolist()
@@ -291,8 +291,8 @@ def GetCalPPA(datachoose,conn,number = 3):
             sql2 = '''
                   select * from eva_all 
                   where glass_id in (%s)
-                  and mask_id ='%s' and port = '%s'
-                ''' %(str(GlassAdd)[1:-1],mask,port)
+                  and mask_id ='%s' and port = '%s' and groupid=%d
+                ''' %(str(GlassAdd)[1:-1],mask,port,groupid)
             data2=pd.read_sql_query(sql2,conn)
             data1=data1.append(data2).drop_duplicates()
     
