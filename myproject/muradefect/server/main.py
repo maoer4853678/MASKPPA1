@@ -51,7 +51,7 @@ def GetOption():
     
     base_args = {}
     base_args['starttime'] = config.get("base","starttime")
-    end_time=datetime.datetime.now()
+    end_time=datetime.datetime.now()-datetime.timedelta(hours=1) ## 保证数据完整性
     base_args['endtime'] =end_time.strftime('%Y-%m-%d %H:%M:%S')
     base_args['running'] =  config.get("base","running")
     #time_args['endtime'] ='2019-06-19 06:00:00'
