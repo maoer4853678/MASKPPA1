@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+8# -*- coding: utf-8 -*-
 '''
 尝试新的cycleID赋值逻辑：
 1、以GroupID，line作为颗粒度，取eva_chamber==’OC_8’，分port A、B计算maskset的变化。
@@ -388,9 +388,9 @@ if __name__=="__main__":
     logger.addHandler(handler)
     logger.addHandler(console)   
     
-#    for i in range(5):
     try:
         Main(logger)
     except Exception as e:
-        logger.info("**** 程序出现异常 异常代码 : %s"%e)
-    
+        logger.info("**** 程序出现异常 异常代码 : %s"%e)        
+        Send(title = 'APP ERROR ',content = "",images = [{"content":e,"file":""}],\
+             recv=['dongzhaoyu@k2data.com.cn',"wangjidong@k2data.com.cn"])

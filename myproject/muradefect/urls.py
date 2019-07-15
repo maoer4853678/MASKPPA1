@@ -3,7 +3,7 @@ from django.contrib import admin
 from . import views
 
 
-app_name = 'polls'
+app_name = 'muradefect'
 urlpatterns = [
     path('admin', admin.site.urls),
     

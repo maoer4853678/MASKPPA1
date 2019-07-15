@@ -27,6 +27,9 @@ nohup bash runserver.sh
 cd /root/ppa/muradefect/server/
 
 
+cycleid Âß¼­Ð£Ñé
+
+
 
 
 
