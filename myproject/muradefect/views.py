@@ -163,7 +163,7 @@ def plot_data(df,init,weightx = 3.1,weighty = 8.1):
                            ,df.groupby('x_label'))) ## 垂直方向
         ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('y_label'))) ## 水平方向
-        
+        print ("ppa_len debug",len(ppa_ver),len(ppa_hor))
         thresholds["PPA_X"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\
                   values.tolist(),df.groupby('x_label'))) 
         thresholds["PPA_Y"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\

@@ -163,7 +163,9 @@ function FreshData(select){
        else{
         text = glassid+" "+chamber+": 优化后"+item+"分布"
        } 
+       myChart.clear();
        option.title.text = text
+       option.series = []
        scatter = {
             name : "position",
             symbolSize: 5,
@@ -202,7 +204,7 @@ function FreshData(select){
                }   
             }
        }
-
+       console.log("debug",alldata[select][item].length)
        for (var i = 0; i < alldata[select][item].length; i++) {
            line = {
             name : "ppa",
