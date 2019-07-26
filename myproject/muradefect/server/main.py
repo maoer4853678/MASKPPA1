@@ -1,4 +1,4 @@
-8# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 '''
 尝试新的cycleID赋值逻辑：
 1、以GroupID，line作为颗粒度，取eva_chamber==’OC_8’，分port A、B计算maskset的变化。
@@ -51,7 +51,7 @@ def GetOption():
     
     base_args = {}
     base_args['starttime'] = config.get("base","starttime")
-    end_time=datetime.datetime.now()-datetime.timedelta(hours=1) ## 保证数据完整性
+    end_time=datetime.datetime.now()-datetime.timedelta(hours=1)  ## 延迟一小时获取数据，保证数据完整性
     base_args['endtime'] =end_time.strftime('%Y-%m-%d %H:%M:%S')
     base_args['running'] =  config.get("base","running")
     #time_args['endtime'] ='2019-06-19 06:00:00'
@@ -131,6 +131,11 @@ def InsertCIM(df,init1):
     df['chambername'] = '2CEE01-'+df.eva_chamber.map(DD)+'-'+\
             df.eva_chamber.str.replace('C_','')+df.line.astype(str)
     df['linetype'] = df.port.str.replace('C','A').replace('D','B')
+    
+    df['after_x'] = (df['after_x'] * 2).round()/ 2.0
+    df['after_y'] = (df['after_y'] * 2).round()/ 2.0
+    df['after_t'] = df['after_t'].round()
+    
     df['evaoffsetx'] = df["after_x"]
     df['evaoffsety'] = df["after_y"]
     df['evaoffsettheta'] = df["after_t"]
@@ -391,6 +396,11 @@ if __name__=="__main__":
     try:
         Main(logger)
     except Exception as e:
-        logger.info("**** 程序出现异常 异常代码 : %s"%e)        
-        Send(title = 'APP ERROR ',content = "",images = [{"content":e,"file":""}],\
-             recv=['dongzhaoyu@k2data.com.cn',"wangjidong@k2data.com.cn"])
+        logger.info("**** 程序出现异常 异常代码 : %s"%e)
+        Send(title = 'APP ERROR',content = "",images = [{"content":e,"file":""}],\
+             recv = ["dongzhaoyu@k2data.com.cn",'wangjidong@k2data.com.cn'])
+        
+        
+        
+        
+    

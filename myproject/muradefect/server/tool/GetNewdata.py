@@ -1,4 +1,4 @@
-88#coding=utf-8
+#coding=utf-8
 '''
 王吉东做的更改：
 1、Pmaskid中：在line==2的情况下，port A/B改成 C/D
@@ -99,8 +99,20 @@ def PPA(starttime,endtime,conn):
     P0.glass_start_time = pd.to_datetime(P0.glass_start_time)
     P0.eva_chamber = P0.eva_chamber.str.replace(' ', '')    
     P0 = P0[P0.glass_id.str.startswith('L2E')]
-    P1 = P0[(~P0.ppa_x.isna()) &
-            (~P0.product_id.isna())]
+    
+    
+    temp1=P0[(P0.ppa_x.isna())|(P0.product_id.isna())][['glass_id','eva_chamber']].drop_duplicates()
+    temp1['J']=1
+    
+    P1=pd.merge(P0,temp1,how='outer')
+    P1=P1[P1.J.isna()]
+    P1.drop('J',axis=1,inplace=True) 
+    
+#    P1=P1[(P0.ppa_x.isna())|(P0.product_id.isna())][['glass_id','eva_chamber']]
+#    
+#    P1 = P0[(~P0.ppa_x.isna()) &
+#            (~P0.product_id.isna())]
+    
     #P2 = P1.sort_values(['glass_id', 'eva_chamber','glass_start_time']).drop_duplicates(['glass_id', 'eva_chamber'],keep='first') 
     P1.eva_chamber = P1.eva_chamber.map({'OC_B\'':'OC_3',
                                          'OC_B'  :'OC_4',
@@ -112,6 +124,7 @@ def PPA(starttime,endtime,conn):
     P1.pos_y = P1.pos_y.apply(lambda x: round(x, 3))
     p1 = P1.sort_values(['glass_start_time'])
 #    TagN=int(p1.teg_count.unique())
+    
     p1=Get_Label(p1)
 #    print (p1.shape)
 #    print (p1.head())

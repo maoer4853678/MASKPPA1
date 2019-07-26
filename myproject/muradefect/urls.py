@@ -3,7 +3,7 @@ from django.contrib import admin
 from . import views
 
 
-app_name = 'muradefect'
+app_name = 'polls'
 urlpatterns = [
     path('admin', admin.site.urls),
     
@@ -22,6 +22,7 @@ urlpatterns = [
     
     ## RestFul api
     path('log', views.LogEtl, name='log'),
+    path('debug', views.Debug, name='debug'),
     path('clear', views.Clear, name='clear'),
     path('setrateoption', views.SetRateOption, name='setrateoption'),
     path('download/<str:filename>', views.DownLoad, name='DownLoad'),

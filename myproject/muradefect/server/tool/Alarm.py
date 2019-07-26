@@ -338,10 +338,10 @@ def check_email(checklist,email):
             send_str+='<td>  %s </td>'%j
         send_str+='</tr>'
     send_str+= "</table>"
-    filename = os.path.join(IMAGE,"checklist.csv")
+    filename = os.path.join(IMAGE,"checklist.xlsx")
     checklist.columns = ['优化时间','腔室','Port','Mask ID','优化前X','优化前Y','优化前T',\
                         '改变量X','改变量Y','改变量T','优化后X','优化后Y','优化后T']
-    checklist.to_csv(filename,index=False)
+    checklist.to_excel(filename,index=False)
     msg = Send(title = '最新offset结果点检表' ,content='',images = [{"content":send_str,"file":""}],\
                recv = email['list'],file =filename)
     print ("checklist",msg)

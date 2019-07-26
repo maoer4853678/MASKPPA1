@@ -55,9 +55,14 @@ def GetProductDict():
 def GetOffsetSta():
     ## 最近一周的 offset统计结果，可以改成sql 执行返回结果
     try:
-        endtime = datetime.datetime.now()
+        endtime = datetime.datetime.now() + datetime.timedelta(hours=8) ## 时区
     #    starttime = endtime - datetime.timedelta(days=7) ## 正常看一周
         starttime = endtime - datetime.timedelta(days=90)
+        print ("GetOffsetSta",starttime,endtime)
+        with open("1.txt",'w') as f:
+            f.write(str(endtime)+"\n")
+            f.write(str(starttime))
+        
         sql = '''
         select distinct product_id as productid,groupid,line,eva_chamber as chamber,\
          port,cycleid,starttime,endtime,glasscount as count from offset_table  \
@@ -77,6 +82,8 @@ def GetOffsetSta():
         return pd.DataFrame(),pd.DataFrame()
 
 def GetPpaData(starttime,endtime,product,maskids):
+    endtime= endtime+" 23:59:59"
+    print (endtime)
     data = pd.read_sql_query("select ppa_x,ppa_y,glass_id,mask_id,x_label,y_label from eva_all \
                              where eventtime >='%s' and eventtime <= '%s' \
                              and product_id = '%s' and mask_id in (%s) \
@@ -163,7 +170,7 @@ def plot_data(df,init,weightx = 3.1,weighty = 8.1):
                            ,df.groupby('x_label'))) ## 垂直方向
         ppa_hor = list(map(lambda x:x[1][['ppa_x', 'ppa_y']].values.tolist()\
                            ,df.groupby('y_label'))) ## 水平方向
-        print ("ppa_len debug",len(ppa_ver),len(ppa_hor))
+        
         thresholds["PPA_X"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\
                   values.tolist(),df.groupby('x_label'))) 
         thresholds["PPA_Y"]["middle"] = list(map(lambda x:x[1][['pos_x', 'pos_y']].\
@@ -423,6 +430,7 @@ def LogEtl(request):
     print ("获取 LogEtl 数据请求")
     logpath = './muradefect/server/log'
     files = os.listdir(logpath)
+    files.sort()
     if len(files):
         path = os.path.join(logpath,files[-1])
         file=open(path,'rb')  
@@ -431,6 +439,21 @@ def LogEtl(request):
         response['Content-Disposition']='attachment;filename="%s"'%path
         return response
 
+def Debug(request):
+    print ("获取 LogEtl 数据请求")
+    sql = '''
+    select distinct glass_id,groupid,eva_chamber,eventtime,product_id,mask_set,mask_id,port,cycleid \
+        from eva_all where eva_chamber = 'OC_8' order by eventtime desc 
+    '''
+    df = pd.read_sql_query(sql,con=conn.obj.conn) 
+    path = "./tempdir/debug.csv"
+    df.to_csv(path,index=False)
+    file=open(path,'rb')  
+    response =FileResponse(file)  
+    response['Content-Type']='application/octet-stream'  
+    response['Content-Disposition']='attachment;filename="%s"'%path
+    return response
+    
 ################################################## 主要视图  ##############################################
     
 @need_logged_in

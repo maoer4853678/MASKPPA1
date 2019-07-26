@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block header %}
 <script src="../static/js/echarts.js"></script>
@@ -41,7 +41,6 @@
                      <a  class="btn waves-effect waves-light btn-warning hidden-md-down" id = "ensure"> 查询 </a>
                 </div>
                 </div>
-
 
                 <div class="row">
                     <div class="breadcrumb">
@@ -165,7 +164,6 @@ function FreshData(select){
        } 
        myChart.clear();
        option.title.text = text
-       option.series = []
        scatter = {
             name : "position",
             symbolSize: 5,
@@ -204,7 +202,7 @@ function FreshData(select){
                }   
             }
        }
-       console.log("debug",alldata[select][item].length)
+
        for (var i = 0; i < alldata[select][item].length; i++) {
            line = {
             name : "ppa",
