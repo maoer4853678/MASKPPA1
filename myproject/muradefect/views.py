@@ -202,8 +202,8 @@ def BeforeData(glassid,chamber):
 
 def AfterData(data):
     ## tAfterData 是按照before中的属性信息从 offset_table中取出优化结果
-    cols = ["product_id",'eva_chamber',"mask_set",'port']
-    cols1 = ["groupid",'line','cycleid']
+    cols = ["product_id",'eva_chamber',"mask_set",'port','cycleid']
+    cols1 = ["groupid",'line']
     conditon = list(map(lambda x:"%s = '%%s' "%x,cols))+list(map(lambda x:"%s = %%s "%x,cols1))
     conditon = ' and '.join(conditon)
     product_id,eva_chamber,mask_set,port,groupid,line,cycleid= data[cols+cols1].iloc[0].tolist()
@@ -329,18 +329,21 @@ def GetOffset(request):
     groupid = request.POST.get("groupid")
     cycleid = request.POST.get("cycleid") 
     product = request.POST.get("product") 
-    line = request.POST.get("line") 
+#    line = request.POST.get("line") 
+    print (groupid,cycleid,product)
     sql = '''
     select product_id as productid,groupid,line,eva_chamber as chamber,\
          port,cycleid,mask_id as maskid,starttime,endtime, delta_x,delta_y, delta_t as delta_tht,\
          after_x, after_y, after_t as after_tht from offset_table  \
-         where groupid =%s and cycleid = %s and PRODUCT_ID = '%s' and line = %s
-    '''%(groupid,cycleid,product,line)
+         where groupid =%s and cycleid = '%s' and PRODUCT_ID = '%s' 
+    '''%(groupid,cycleid,product)
     try:
         df = pd.read_sql_query(sql,con=conn.obj.conn)   
         df.columns = df.columns.str.upper()
+        print ("df.shape",df.shape)
         data,fields = GenerateTable(df)
-    except:
+    except Exception as e:
+        print (e)
         data = fields = [],[]
         conn.obj.conn.rollback()
         
@@ -481,7 +484,7 @@ def Offset(request):
     if len(res):
         groupid,line,cycleid = res[['GROUPID','LINE','CYCLEID']].iloc[0].tolist()
     else:
-        groupid,line,cycleid =0,1,0
+        groupid,line,cycleid ='','',''
     stadata,stafields = GenerateTable(res)
     return render(request, 'offset.html',{'username': username,"products":products,"stadata":json.dumps(stadata),\
                                           "stafields":json.dumps(stafields),"groupid":groupid,"line":line,\

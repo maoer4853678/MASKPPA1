@@ -100,7 +100,6 @@ def PPA(starttime,endtime,conn):
     P0.eva_chamber = P0.eva_chamber.str.replace(' ', '')    
     P0 = P0[P0.glass_id.str.startswith('L2E')]
     
-    
     temp1=P0[(P0.ppa_x.isna())|(P0.product_id.isna())][['glass_id','eva_chamber']].drop_duplicates()
     temp1['J']=1
     
@@ -184,79 +183,92 @@ def DataCollect(starttime,endtime,conn):
         print ("DF.shape",DF.shape)
         DF=DF[col]   
     return DF
-
 def CycleJudge(df,conn):
-    ## df 是本周期 获取的数据
+    datachoose=pd.DataFrame(columns=['groupid','cycleid'])
+    TimeNew=df.eventtime.min() #新数据的第一条记录的eventtime
+    line_new=int(df[df.eva_chamber==df.eva_chamber.max()].line.unique()[0])#处理不了跨line的情况了。
     groupid = pd.read_sql_query("select max(groupid) from eva_all",conn)['max'].iloc[0]
-    cycleid = pd.read_sql_query("select max(cycleid) from eva_all \
-                                where groupid=%d"%(groupid),conn)['max'].iloc[0]
+    TimeOld=pd.read_sql_query("select max(eventtime) from eva_all",conn)['max'].iloc[0] #旧数据（已存入数据库的数据）的最后一条数据       
+    L = pd.read_sql_query("select distinct line from eva_all where groupid=%d"%(groupid),conn)['line'].tolist()
     
-    ###############
-    TimeNew=df.eventtime.min()
-    TimeOld=pd.read_sql_query("select max(eventtime) from eva_all",conn)['max'].iloc[0]
-    
-    if (pd.to_datetime(TimeNew)-pd.to_datetime(TimeOld))>pd.to_timedelta(22,unit='h'):
-        datachoose = [groupid,cycleid]
-        datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
-        groupid+=1
-        cycleid=0
-        df['groupid']=groupid
-        df['cycleid']=cycleid   
+    #第一步：判断groupID是否变化.
+    if (TimeNew-TimeOld)>pd.to_timedelta(22,unit='h'):
+        for l in L:
+            cycle=pd.read_sql_query("""select max(cycleid) from eva_all
+                                where groupid=%d and left(cycleid,2)='%s'"""\
+                                %(groupid,'L'+str(l)),conn)['max'].iloc[0]
+            if cycle!=None:
+                tempchoose=pd.DataFrame([[groupid,cycle]],columns=['groupid','cycleid'])
+                datachoose=datachoose.append(tempchoose)
+        c=0
+        cycleid='L'+str(line_new)+"-"+str(c).zfill(3)
+        df['groupid']=groupid+1
+        df['cycleid']=cycleid
+        datachoose.groupid=datachoose.groupid.astype(np.int64)
     else:
-        data = pd.read_sql_query('''
-                select distinct cycleid,eva_chamber,port,mask_id,eventtime
-                from eva_all where groupid =%d and cycleid = %d'''%(groupid,cycleid),conn)
-
-        data = data.sort_values("eventtime").drop_duplicates(['eva_chamber','port'],keep='last').\
-                drop("eventtime",axis=1)
-        data.rename(columns={'mask_id':'mask_id_old'},inplace=True)
-        
-        cycleids = {}
-        for glass_id in df.glass_id.unique():
-            cycleids[glass_id] = cycleid  #默认cycle不变
-            '''
-            temp中，按照glassid取出所有chamber，随后选出最大的
-            '''
-            temp = df[df.glass_id==glass_id][['eva_chamber','port','mask_id']].drop_duplicates() #针对每片Glass，一一判断cycle   
-            temp=temp[temp.eva_chamber==temp.eva_chamber.max()]
-            temp.rename(columns={'mask_id':'mask_id_new'},inplace=True)
-            '''
-            1、新旧均rename一下mask_id;
-            2、首先判断新数据里[chamber, port] 在不在旧数据中，不在的话，暂时无法判别其 cycleid，默认为原cycleid
-            具体体现就是：merge(on=[chamber, port])后，若为空，则保持原cycle
-            3、若不为空，则判断maskid是否相同。            
-            '''                
-            temp1 = pd.merge(temp,data,on = ['port','eva_chamber']) 
-            temp1['judge']=(temp1.mask_id_old!=temp1.mask_id_new) #因为指定了glassID，因此len(temp1)只有可能等于0或1
-            if (temp1.judge.max()==True): #temp1.judge.max()可能存在3种情况：True，False，nan
-                cycleids[glass_id] = cycleids[glass_id]+1
+        cycle=pd.read_sql_query("""select max(cycleid) from eva_all
+                                where groupid=%d and left(cycleid,2)='%s'"""\
+                                %(groupid,'L'+str(line_new)),conn)['max'].iloc[0]
+        if (cycle==None): #有可能新到的数据对应的line，在同group里找不到历史数据，这样可以直接判断了
+            c=0
+            cycleid='L'+str(line_new)+"-"+str(c).zfill(3)
+            df['groupid']=groupid
+            df['cycleid']=cycleid
+        else: #以下是确定能找到同group同line下有旧数据
+            c0=int(cycle.split("-")[-1])
+#            第1步：判断 时间间隔 是否大于3小时（新加的判断）
+#            Time_Old_sameline=pd.read_sql_query("select max(eventtime) from eva_all where cycleid='%s'"\
+#                                                %(cycle),conn)['max'].iloc[0]
+#            
+#            if (TimeNew-Time_Old_sameline)>pd.to_timedelta(3,unit='h'):
+#                c=c0+1
+#            else:
+            #第2步：判断productID是否变化。
+            product_id_old=pd.read_sql_query("select distinct product_id from eva_all \
+                                    where groupid=%d and cycleid='%s'"\
+                                     %(groupid,cycle),conn).loc[0,'product_id']
             
-        #df1 = df[df.eva_chamber=='OC_8'][['glass_id','eventtime']].drop_duplicates().sort_values("eventtime")  
-        df1=df.sort_values("eventtime").drop_duplicates(['glass_id'],keep='last')            
-        df1['cycleid'] = df1['glass_id'].map(cycleids)
-        for i in range(len(df1)):
-            df1['temp'] = df1["cycleid"].diff()
-            if len(df1[df1['temp']<0])==0:
-                break
-            df1.loc[df1[df1.temp<0].index,'cycleid'] = np.nan
-            df1["cycleid"]= df1["cycleid"].fillna(method = "ffill")            
-        cycleids = dict(zip(df1['glass_id'],df1["cycleid"]))         
+            product_id_new=df.product_id.unique()[0]
+            
+            if (product_id_new!=product_id_old):   #productID变了，直接判断cycleID改变，并赋值
+                c=c0+1
+            else:  
+                #第3步：判断新数据的chamber的最大值的maskid是否变化（需要新旧数据联合起来去最大chamber）
+                data = pd.read_sql_query("""
+                    select distinct eva_chamber,port,mask_id,eventtime
+                    from eva_all where groupid =%d and cycleid ='%s'"""%(groupid,cycle),conn)
         
-        df['groupid']=groupid
-        df['cycleid'] = df["glass_id"].map(cycleids)
-        df=df.sort_values('eventtime')           
-        if df['cycleid'].max()!= cycleid:
-            datachoose = [groupid,cycleid]
-            datachoose=pd.DataFrame([datachoose],columns=['groupid','cycleid'])
-        else:
-            datachoose = pd.DataFrame([],columns=['groupid','cycleid'])
-  
-    return df,datachoose
+                data = data.sort_values("eventtime").drop_duplicates(['eva_chamber','port'],keep='last').\
+                        drop("eventtime",axis=1) #取出每个[chamber，port]下的最新一条数据
+                data.rename(columns={'mask_id':'mask_id_old'},inplace=True)
+                data.index=range(len(data))
+                #temp是新数据中做选择；按照glassid取出所有chamber，随后选出最大的
+                temp = df[['eva_chamber','port','mask_id']].drop_duplicates()
+                temp.rename(columns={'mask_id':'mask_id_new'},inplace=True)
+                
+                temp1 = pd.merge(temp,data,on = ['eva_chamber','port'])  #因为port的原因，可能为空，但是也不影响后面两行。                   
+                temp1=temp1[temp1.eva_chamber==temp1.eva_chamber.max()]
+                temp1['judge']=(temp1.mask_id_old!=temp1.mask_id_new) #因为指定了glassID，因此len(temp1)只有可能等于0或1
+                
+                if (temp1.judge.max()!=True):                        
+                    c=c0
+                else:
+                    c=c0+1
+        
+            df['groupid']=groupid
+            cycleid='L'+str(line_new)+"-"+str(c).zfill(3)            
+            df['cycleid'] = cycleid
+            if (c-c0): #cycleID变化了；"cycle"是旧数据最后一条的cycleID；因此，不论c是否加1了，cycle都不变
+                tempchoose=pd.DataFrame([[groupid,cycle]],columns=['groupid','cycleid'])
+                datachoose=datachoose.append(tempchoose)
+                datachoose.groupid=datachoose.groupid.astype(np.int64)
+        
+    return df.sort_values('eventtime'),datachoose
 
-def Getcalmap(data,conn,tablename = 'eva_all'):
+def Getcalmap(datachoose,conn,tablename = 'eva_all'):
     conn.delete_table("temp")
-    conn.creat_table_from_df("temp",data)
-    conn.insert_df("temp",data)
+    conn.creat_table_from_df("temp",datachoose)
+    conn.insert_df("temp",datachoose)
     cols = conn.show_schema("temp")['Field'].tolist()
     conditon = ' and '.join(map(lambda x:" t1.%s=t2.%s "%(x,x),cols))
     sql='''
@@ -272,9 +284,9 @@ def GetCalPPA(datachoose,conn,number = 3):
     '''
     sql1:取出指定cycle内所有的数据    
     '''
-    sql1='''
-        select * from eva_all where groupid=%d and cycleid=%d
-        '''%(groupid,cycleid)
+    sql1="""
+        select * from eva_all where groupid=%d and cycleid='%s'
+        """%(groupid,cycleid)
     data1=pd.read_sql_query(sql1,conn)
     ###########
     '''
@@ -320,12 +332,17 @@ def GetCalPPA(datachoose,conn,number = 3):
 def CreateOffsetAfter(g):
     g1 =g[['eventtime','glass_id','offset_x','offset_y','offset_tht']].sort_values('eventtime').\
             drop_duplicates().set_index("glass_id")
+    offset0=g1.loc[g1.index[-1],['offset_x','offset_y','offset_tht']]
     t1 = (g1.loc[g1.index[-1]]-g1).reset_index().drop('eventtime',axis=1).apply(pd.to_numeric,errors='ignore')
     t1.offset_tht=(-1)*t1.offset_tht
     t1 =t1.rename(dict(zip(['offset_x','offset_y','offset_tht'],['delta_y','delta_x','delta_t'])),axis=1)
     t2 = pd.merge(g,t1,on = ['glass_id'])
     t2['ppa_x'] = t2['ppa_x']+t2['delta_x']-t2['delta_t']*t2['pos_y'] * np.pi / 180 / 100
     t2['ppa_y'] = t2['ppa_y']+t2['delta_y']+t2['delta_t']*t2['pos_x'] * np.pi / 180 / 100
+    t2[['offset_x','offset_y','offset_tht']]    
+    t2.offset_x=offset0.offset_x
+    t2.offset_y=offset0.offset_y
+    t2.offset_tht=offset0.offset_tht
     
     return t2.drop(['delta_x','delta_y','delta_t'],axis=1)
     
